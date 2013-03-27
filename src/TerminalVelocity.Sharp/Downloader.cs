@@ -114,9 +114,6 @@ namespace Illumina.TerminalVelocity
             return task;
         }
 
-      //  internal static LargeFileDownloadProgressChangedEventArgs CreateProgress(int currentChunk, int totalChunks, )
-
-      
         internal static Task CreateDownloadTask(ILargeFileDownloadParameters parameters,
                                                 ConcurrentDictionary<int, byte[]> contentDic,
                                                 AutoResetEvent reset, Func<int> getNextChunk,
