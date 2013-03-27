@@ -52,7 +52,6 @@
     <Compile Include="HttpParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SimpleHttpClientException.cs" />
-    <Compile Include="SimpleHttpClientRetryLogic.cs" />
     <Compile Include="SimpleHttpGetByRangeClient.cs" />
     <Compile Include="SimpleHttpResponse.cs" />
     <Compile Include="SocketErrorCodes.cs" />

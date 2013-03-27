@@ -76,7 +76,7 @@ namespace Illumina.TerminalVelocity.Tests
                                                 return true;
                                             };
 
-            var task = LargeFileDownloadCommand.CreateDownloadTask(parameters, dict,e, getNext, shouldSlw, clientFactory: (x) => mockClient.Object );
+            var task = Downloader.CreateDownloadTask(parameters, dict,e, getNext, shouldSlw, clientFactory: (x) => mockClient.Object );
             task.Start();
             task.Wait(2000);
             try
@@ -122,7 +122,7 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             
-            var task = LargeFileDownloadCommand.CreateDownloadTask(parameters, dict, e, getNext, shouldSlw, clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = Downloader.CreateDownloadTask(parameters, dict, e, getNext, shouldSlw, clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
@@ -136,15 +136,15 @@ namespace Illumina.TerminalVelocity.Tests
         {
             long fileSize = 29996532;
             int maxChunk = LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE;
-            var chunkCount =LargeFileDownloadCommand.GetChunkCount(fileSize, maxChunk);
+            var chunkCount =Downloader.GetChunkCount(fileSize, maxChunk);
             Assert.True(chunkCount == 6);
             long totalBytes = 0;
             long lastChunkStart = 0;
             int lastChunkLength = maxChunk;
             for (int i = 0; i < chunkCount; i++)
             {
-                var chunkStart = LargeFileDownloadCommand.GetChunkStart(i, maxChunk);
-                var chunkLength = LargeFileDownloadCommand.GetChunkSizeForCurrentChunk(fileSize, maxChunk, i);
+                var chunkStart = Downloader.GetChunkStart(i, maxChunk);
+                var chunkLength = Downloader.GetChunkSizeForCurrentChunk(fileSize, maxChunk, i);
                 Debug.WriteLine(string.Format("chunk {0} start {1} length {2}", i, chunkStart, chunkLength));
                 totalBytes += chunkLength;
                 lastChunkStart = chunkStart;

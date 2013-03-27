@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Illumina.TerminalVelocity
 {
-    public static class LargeFileDownloadCommand
+    public static class Downloader
     {
         public static Task DownloadAsync(this ILargeFileDownloadParameters parameters,
                                          CancellationToken? cancellationToken = null,
@@ -77,7 +77,7 @@ namespace Illumina.TerminalVelocity
                                 else
                                 {
                                     //are any of the treads alive?
-                                    if (downloadTasks.Any(x => x != null && x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun))
+                                    if (downloadTasks.Any(x => x != null && (x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun)))
                                     {
                                         //wait for something that was added
                                         addEvent.WaitOne(100);
