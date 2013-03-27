@@ -43,7 +43,7 @@ Purpose of this project is to download a large file in .net as fast as possible.
 
 - Set the file output
 
-`TerminalVelocity.exe http://tinyurl.com/cynt8ht --f="C:\github\TerminalVelocity\src\TerminalVelocity.Console\bin\Debug\helloworld.txt" '
+`TerminalVelocity.exe http://tinyurl.com/cynt8ht --f="C:\github\TerminalVelocity\src\TerminalVelocity.Console\bin\Debug\helloworld.txt" `
 
 
 
