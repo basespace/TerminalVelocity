@@ -50,6 +50,18 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
         [Fact]
+        public void ChunkCalculationsForLargeFiles()
+        {
+            int maxChunkSize = 5242880;
+            int currentChunk = 411;
+            long fileSize = 141705080397;
+            long chunkStart = Downloader.GetChunkStart(currentChunk, maxChunkSize);
+            Assert.True(chunkStart == 2154823680);
+            long chunkSize = Downloader.GetChunkSizeForCurrentChunk(fileSize, maxChunkSize, currentChunk);
+            Assert.True(chunkSize == maxChunkSize);
+        }
+
+        [Fact]
         public void ThrottleDownloadWhenQueueIsFull()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);

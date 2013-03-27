@@ -119,7 +119,7 @@ Range: bytes={2}-{3}
 
             if (statusCode >= 200 && statusCode <= 300)
             {
-                long contentLength = int.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
+                long contentLength = long.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
 
                 var dest = new Byte[contentLength];
                 using (var outputStream = new MemoryStream(dest))

@@ -204,7 +204,7 @@ namespace Illumina.TerminalVelocity
 
         internal static long GetChunkStart(int currentChunk, int maxChunkSize)
         {
-            return currentChunk*(maxChunkSize);
+            return currentChunk*(long)maxChunkSize;
         }
 
         internal static int GetChunkCount(long fileSize, int chunkSize)
