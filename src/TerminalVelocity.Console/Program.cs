@@ -94,26 +94,26 @@ namespace Illumina.TerminalVelocity.Host
                                 {
                                     {"h|?|help", "Show available options", o => options.ShowHelp = true},
                                     {"i|interactive", "interactive mode, no exit codes",o => options.IsInteractive = true},
-                                    {"fs|filesize|size", "The expected file size", (long o) => options.FileSize = o},
+                                    {"fs|filesize|size=", "The expected file size", (long o) => options.FileSize = o},
                                     {
-                                        "mc|maxchunksize|maxchunk|chunkschnizzle", "Max Chunk Size",
-                                        (int o) => options.MaxChunkSize = 0
+                                        "mc|maxchunksize|maxchunk|chunkschnizzle=", "Max Chunk Size",
+                                        (int o) => options.MaxChunkSize = o
                                     },
                                     {
-                                        "mt|maxthreads|threadschnizzle", "Max thread count",
-                                        (int o) => options.MaxThreads = 0
+                                        "mt|maxthreads|threadschnizzle=", "Max thread count",
+                                        (int o) => options.MaxThreads = o
                                     },
                                     {"q|quit", "Quit", v => options.ShouldExit = true},
                                     {
                                         "f|file=", "the file to be created, will overwrite if exists",
-                                        f => options.OutputFile = f
+                                        f => options.OutputFile =  f.Replace(@"""", "")
                                     },
                                     {
                                         "<>", "the url to retrieve", f =>
                                                                          {
                                                                              try
                                                                              {
-                                                                                 options.Uri = new Uri(f);
+                                                                                 options.Uri = new Uri(f.Replace(@"""", ""));
                                                                              }
                                                                              catch (Exception e)
                                                                              {
@@ -140,7 +140,7 @@ namespace Illumina.TerminalVelocity.Host
 
             if (response != null)
             {
-                if (response.IsStatusCodeRedirect && String.IsNullOrWhiteSpace(response.Location))
+                if (response.IsStatusCodeRedirect && !String.IsNullOrWhiteSpace(response.Location))
                 {
                     if (response.Location != options.Uri.AbsoluteUri)
                     {
@@ -153,7 +153,7 @@ namespace Illumina.TerminalVelocity.Host
                         throw new ArgumentException("Supplied Url has no source");
                     }
                 }
-                 if (response.WasSuccessful && response.ContentRangeLength >= 0)
+                 else if (response.WasSuccessful && response.ContentRangeLength >= 0)
                 {
                     options.FileSize = response.ContentRangeLength;
                 }
