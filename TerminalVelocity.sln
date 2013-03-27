@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerminalVelocity.Tests", "tests\TerminalVelocity.Tests\TerminalVelocity.Tests.csproj", "{3D1F5ADD-BA71-456E-BBA9-0839871724A7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerminalVelocity.Sharp", "src\TerminalVelocity.Sharp\TerminalVelocity.Sharp.csproj", "{9FE91B4B-5C87-4AC8-B15D-449987CAF4DA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{F70F6DA0-8392-42AF-9C9B-9906D7218055}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerminalVelocity.Console", "src\TerminalVelocity.Console\TerminalVelocity.Console.csproj", "{036AF7AC-7D77-4D8E-84D4-B44218352061}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3D1F5ADD-BA71-456E-BBA9-0839871724A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D1F5ADD-BA71-456E-BBA9-0839871724A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D1F5ADD-BA71-456E-BBA9-0839871724A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D1F5ADD-BA71-456E-BBA9-0839871724A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FE91B4B-5C87-4AC8-B15D-449987CAF4DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FE91B4B-5C87-4AC8-B15D-449987CAF4DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FE91B4B-5C87-4AC8-B15D-449987CAF4DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FE91B4B-5C87-4AC8-B15D-449987CAF4DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{036AF7AC-7D77-4D8E-84D4-B44218352061}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{036AF7AC-7D77-4D8E-84D4-B44218352061}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{036AF7AC-7D77-4D8E-84D4-B44218352061}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{036AF7AC-7D77-4D8E-84D4-B44218352061}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

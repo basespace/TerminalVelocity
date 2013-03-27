@@ -1,0 +1,15 @@
+﻿HTTP/1.1 206 Partial Content
+x-amz-id-2: Z7W3VBMmA5GZvjm6yHrkwmqGqSes/zsBbX+USKWa03PggApaacncAjm0+wbm8+98
+x-amz-request-id: 6E2AA09181E64A75
+Date: Wed, 06 Mar 2013 00:18:19 GMT
+x-amz-meta-mode: 33261
+x-amz-meta-s3cmd-attrs: uid:11039/gname:trace/uname:xiao2/gid:5008/mode:33204/mtime:1335442661/atime:1335972843/ctime:1335972843
+Last-Modified: Wed, 23 May 2012 15:24:34 GMT
+ETag: "290f8099861e8089cec020508a57d2b2"
+Accept-Ranges: bytes
+Content-Range: bytes 0-100/1284396333
+Content-Type: text/x-vcard
+Content-Length: 101
+Server: AmazonS3
+
+�     � BC �2�}[s]ǭ�3�+X'�����h4U�hYq�/��xf�R�L۬ȢE;'�~��-�z�3�Cʑ����h�����������ǧ��_}

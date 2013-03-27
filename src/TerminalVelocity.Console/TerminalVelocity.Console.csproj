@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{036AF7AC-7D77-4D8E-84D4-B44218352061}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Illumina.TerminalVelocity.Host</RootNamespace>
+    <AssemblyName>TerminalVelocity</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DownloadOptions.cs" />
+    <Compile Include="Options.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TerminalVelocity.Sharp\TerminalVelocity.Sharp.csproj">
+      <Project>{9fe91b4b-5c87-4ac8-b15d-449987caf4da}</Project>
+      <Name>TerminalVelocity.Sharp</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+    <CreateItem Include="@(ReferencePath)" Condition="'%(CopyLocal)'=='true'">
+      <Output TaskParameter="Include" ItemName="IlmergeAssemblies" />
+    </CreateItem>
+    <Message Text="MERGING: @(IlmergeAssemblies->'%(Filename)')" Importance="High" />
+    <Exec Command="&quot;$(SolutionDir)\packages\ilmerge.2.13.0307\Ilmerge.exe&quot; /out:@(MainAssembly) &quot;@(IntermediateAssembly)&quot; @(IlmergeAssemblies->'&quot;%(FullPath)&quot;', ' ')" />
+    <CreateItem Include="$(OutputPath)*.dll">
+      <Output TaskParameter="Include" ItemName="DeleteAfterBuild" />
+    </CreateItem>
+    <Delete Files="@(DeleteAfterBuild)" />
+    <CreateItem Include="$(OutputPath)*.pdb">
+      <Output TaskParameter="Include" ItemName="DeleteAfterBuildMore" />
+    </CreateItem>
+    <Delete Files="@(DeleteAfterBuildMore)" />
+    <CreateItem Include="$(OutputPath)*.exe.config">
+      <Output TaskParameter="Include" ItemName="DeleteAfterBuildEvenMore" />
+    </CreateItem>
+    <Delete Files="@(DeleteAfterBuildEvenMore)" />
+  </Target>
+</Project>
