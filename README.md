@@ -5,6 +5,8 @@ Purpose of this project is to download a large file in .net as fast as possible.
 
  This specifically only works with file download over http/https with servers that [accept byte range requests](http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html). Specifically we only support the Range: bytes={start}-{end} header.  Even more specific, this has mainly been used and tested against Amazon S3's http endpoints.
 
+![](http://www.marerico.com/moviepictures/Terminal_Velocity.jpg)
+
 # Install #
 
 - Delivered as a dll or a console application (Nuget coming soon).  
