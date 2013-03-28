@@ -47,6 +47,10 @@ Purpose of this project is to download a large file in .net as fast as possible.
 
 `TerminalVelocity.exe http://tinyurl.com/cynt8ht --f="C:\github\TerminalVelocity\src\TerminalVelocity.Console\bin\Debug\helloworld.txt" `
 
+## Notes ##
+Mono has no SSL certs by default.  Easiest way to add support is to do this:
+sudo /usr/local/bin/mozroots --machine --import --sync
+
 
 
 
