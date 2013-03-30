@@ -27,19 +27,12 @@ namespace Illumina.TerminalVelocity
                         List<Task> downloadTasks = null;
                         try
                         {
-                         
-                            int nextChunkToRead = -1;
+                          
                             int currentChunk = 0;
-                            //next chunk function
-                            Func<int> getNextChunk = () =>
-                                                         {
-                                                             int next = Interlocked.Increment(ref nextChunkToRead);
-                                                             if (next < chunkCount)
-                                                             {
-                                                                 return next;
-                                                             }
-                                                             return -1;
-                                                         };
+                            var readStack = new ConcurrentStack<int>();
+                           
+                            //add all of the chunks to the stack
+                            readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
 
                             // ReSharper disable AccessToModifiedClosure
                             Func<int, bool> shouldISlow = (int c) => (c - currentChunk) > (numberOfThreads*2);
@@ -53,7 +46,7 @@ namespace Illumina.TerminalVelocity
 
                             for (int i = 0; i < numberOfThreads; i++)
                             {
-                                downloadTasks.Add(CreateDownloadTask(parameters, contentDic, addEvent, getNextChunk,
+                                downloadTasks.Add(CreateDownloadTask(parameters, contentDic, addEvent, readStack,
                                                                      shouldISlow, logger, ct));
                             }
                             //start all the download threads
@@ -99,6 +92,7 @@ namespace Illumina.TerminalVelocity
                                 downloadTasks.ForEach(x =>
                                                           {
                                                               if (x == null) return;
+
                                                               ExecuteAndSquash(x.Dispose);
                                                           });
                             }
@@ -116,7 +110,7 @@ namespace Illumina.TerminalVelocity
 
         internal static Task CreateDownloadTask(ILargeFileDownloadParameters parameters,
                                                 ConcurrentDictionary<int, byte[]> contentDic,
-                                                AutoResetEvent reset, Func<int> getNextChunk,
+                                                AutoResetEvent reset, ConcurrentStack<int> readStack ,
                                                 Func<int, bool> shouldSlowDown, Action<string> logger = null,
                                                 CancellationToken? cancellation = null,
                                                 Func<ILargeFileDownloadParameters, ISimpleHttpGetByRangeClient>
@@ -130,63 +124,84 @@ namespace Illumina.TerminalVelocity
                                      logger = logger ?? ((s) => { });
 
                                      ISimpleHttpGetByRangeClient client = clientFactory(parameters);
-                                     int currentChunk = getNextChunk();
+                                     int currentChunk = -1;
+                                     readStack.TryPop(out currentChunk);
                                      int tries = 0;
 
-                                     while (currentChunk >= 0 && tries < 3 && !cancellation.Value.IsCancellationRequested) //-1 when we are done
+                                     try
                                      {
-                                         logger(string.Format("downloading: {0}", currentChunk));
-                                         SimpleHttpResponse response = null;
-                                         try
-                                         {
-                                             response = client.Get(parameters.Uri,
-                                                                   GetChunkStart(currentChunk, parameters.MaxChunkSize),
-                                                                   GetChunkSizeForCurrentChunk(parameters.FileSize,
-                                                                                               parameters.MaxChunkSize,
-                                                                                               currentChunk));
-                                         }
-                                         catch (Exception e)
-                                         {
-                                             logger(e.Message);
-                                             ExecuteAndSquash(client.Dispose);
-                                             client = clientFactory(parameters);
-                                         }
 
-                                         if (response != null && response.WasSuccessful)
+                                         while (currentChunk >= 0 && tries < 3 &&
+                                                !cancellation.Value.IsCancellationRequested) //-1 when we are done
                                          {
-                                             contentDic.AddOrUpdate(currentChunk, response.Content,
-                                                                    (i, bytes) => response.Content);
-                                             tries = 0;
-                                             logger(string.Format("downloaded: {0}", currentChunk));
-                                             reset.Set();
-                                             currentChunk = getNextChunk();
-                                             while (shouldSlowDown(currentChunk))
+                                             logger(string.Format("downloading: {0}", currentChunk));
+                                             SimpleHttpResponse response = null;
+                                             try
                                              {
-                                                 logger(string.Format("throttling for chunk: {0}", currentChunk));
-                                                 if (!cancellation.Value.IsCancellationRequested)
+                                                 response = client.Get(parameters.Uri,
+                                                                       GetChunkStart(currentChunk,
+                                                                                     parameters.MaxChunkSize),
+                                                                       GetChunkSizeForCurrentChunk(parameters.FileSize,
+                                                                                                   parameters
+                                                                                                       .MaxChunkSize,
+                                                                                                   currentChunk));
+                                             }
+                                             catch (Exception e)
+                                             {
+                                                 logger(e.Message);
+                                                 ExecuteAndSquash(client.Dispose);
+                                                 client = clientFactory(parameters);
+                                             }
+
+                                             if (response != null && response.WasSuccessful)
+                                             {
+                                                 contentDic.AddOrUpdate(currentChunk, response.Content,
+                                                                        (i, bytes) => response.Content);
+                                                 tries = 0;
+                                                 logger(string.Format("downloaded: {0}", currentChunk));
+                                                 reset.Set();
+                                                 if (!readStack.TryPop(out currentChunk))
                                                  {
-                                                     Thread.Sleep(500);
+                                                     currentChunk = -1;
+                                                 }
+                                                 while (shouldSlowDown(currentChunk))
+                                                 {
+                                                     logger(string.Format("throttling for chunk: {0}", currentChunk));
+                                                     if (!cancellation.Value.IsCancellationRequested)
+                                                     {
+                                                         Thread.Sleep(500);
+                                                     }
                                                  }
                                              }
-                                         }
-                                         else if (response == null || response.IsStatusCodeRetryable)
-                                         {
-                                             logger(string.Format("sleeping: {0}", currentChunk));
-                                             if (!cancellation.Value.IsCancellationRequested)
+                                             else if (response == null || response.IsStatusCodeRetryable)
                                              {
-                                                 Thread.Sleep((int)Math.Pow(100, tries)); //progressively slow down, don't do this if tries is more than 3 :)
-                                                 tries++; 
+                                                 logger(string.Format("sleeping: {0}", currentChunk));
+                                                 if (!cancellation.Value.IsCancellationRequested)
+                                                 {
+                                                     Thread.Sleep((int) Math.Pow(100, tries));
+                                                     //progressively slow down, don't do this if tries is more than 3 :)
+                                                     tries++;
+                                                 }
+                                             }
+                                             else
+                                             {
+                                                 throw new SimpleHttpClientException(response);
                                              }
                                          }
-                                         else
+                                     }
+                                     finally
+                                     {
+                                         if (currentChunk >= 0)
                                          {
-                                             throw new SimpleHttpClientException(response);
+                                             //put it back on the stack, if it's poison everyone else will die
+                                             readStack.Push(currentChunk);
+                                         }
+                                         if (client != null)
+                                         {
+                                             ExecuteAndSquash(client.Dispose);
                                          }
                                      }
-                                     if (client != null)
-                                     {
-                                            ExecuteAndSquash(client.Dispose);
-                                     }
+
                                  }, cancellation.Value);
             return t;
         }

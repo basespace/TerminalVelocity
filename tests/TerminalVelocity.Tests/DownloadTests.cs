@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -50,6 +51,21 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
         [Fact]
+        public void ReadStackReturnsSequentially()
+        {
+            var readStack = new ConcurrentStack<int>();
+            //add all of the chunks to the stack
+            readStack.PushRange(Enumerable.Range(0, 5).Reverse().ToArray());
+            for (int i = 0; i < 5; i++)
+            {
+                int current;
+                readStack.TryPop(out current);
+                Assert.True(current == i);
+            }
+           
+        }
+
+        [Fact]
         public void ChunkCalculationsForLargeFiles()
         {
             int maxChunkSize = 5242880;
@@ -74,21 +90,17 @@ namespace Illumina.TerminalVelocity.Tests
             mockClient.Setup(x => x.Get(It.IsAny<Uri>(), It.IsAny<long>(), It.IsAny<long>()))
                       .Returns(new SimpleHttpResponse(206, sampleResponse, null));
             int timesAskedForSlow = -1;
-            int current = -1;
-            Func<int> getNext = () =>
-                                    {
-                                        current++;
-                                        if (current > 5)
-                                            return -1;
-                                        return current;
-                                    };
+            
+            var readStack = new ConcurrentStack<int>();
+            //add all of the chunks to the stack
+            readStack.PushRange(Enumerable.Range(0, 5).Reverse().ToArray());
             Func<int, bool> shouldSlw = i =>
                                             {
                                                 timesAskedForSlow++;
                                                 return true;
                                             };
 
-            var task = Downloader.CreateDownloadTask(parameters, dict,e, getNext, shouldSlw, clientFactory: (x) => mockClient.Object );
+            var task = Downloader.CreateDownloadTask(parameters, dict,e, readStack, shouldSlw, clientFactory: (x) => mockClient.Object );
             task.Start();
             task.Wait(2000);
             try
@@ -96,8 +108,57 @@ namespace Illumina.TerminalVelocity.Tests
                 task.Dispose();
             }catch{}
             Assert.True(timesAskedForSlow > 1);
-            Assert.True(getNext() == 2);
+            int next;
+            readStack.TryPop(out next);
+            Assert.True(next == 2);
             Assert.True(Encoding.UTF8.GetString(dict[0]) == "hello world");
+
+        }
+
+        [Fact]
+        public void PutBackOnStackWhenFailed()
+        {
+            var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
+            var dict = new ConcurrentDictionary<int, byte[]>();
+            var e = new AutoResetEvent(false);
+
+            byte[] sampleResponse = Encoding.UTF8.GetBytes("hello world");
+            var mockClient = new Mock<ISimpleHttpGetByRangeClient>();
+
+            mockClient.Setup(x => x.Get(It.IsAny<Uri>(), It.IsAny<long>(), It.IsAny<long>()))
+                      .Throws(new Exception("hahaha"));
+            int timesAskedForSlow = -1;
+
+            var readStack = new ConcurrentStack<int>();
+            //add all of the chunks to the stack
+            readStack.PushRange(Enumerable.Range(0,2).Reverse().ToArray());
+            Func<int, bool> shouldSlw = i =>
+            {
+                timesAskedForSlow++;
+                return true;
+            };
+            try
+            {
+                var ct = new CancellationTokenSource();
+                var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw,
+                                                         clientFactory: (x) => mockClient.Object, cancellation: ct.Token);
+                task.Start();
+                task.Wait(5000);
+                ct.Cancel();
+                task.Wait(10000);
+                task.Dispose();
+
+            }
+            catch
+            {
+            }
+            Assert.True(readStack.Count == 2);
+            int next;
+            readStack.TryPop(out next);
+            Assert.True(next == 0);
+
+
+
 
         }
 
@@ -119,14 +180,9 @@ namespace Illumina.TerminalVelocity.Tests
             });
 
             int timesAskedForSlow = -1;
-            int current = -1;
-            Func<int> getNext = () =>
-            {
-                current++;
-                if (current > 10)
-                    return -1;
-                return current;
-            };
+            var readStack = new ConcurrentStack<int>();
+            //add all of the chunks to the stack
+            readStack.PushRange(Enumerable.Range(0, 5).Reverse().ToArray());
             Func<int, bool> shouldSlw = i =>
             {
                 timesAskedForSlow++;
@@ -134,11 +190,13 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             
-            var task = Downloader.CreateDownloadTask(parameters, dict, e, getNext, shouldSlw, clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw, clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
             task.Wait(TimeSpan.FromMinutes(2));
+            int current;
+            readStack.TryPop(out current);
             Assert.True(current != 10); //we shouldn't get to 10 before the cancel works
 
         }

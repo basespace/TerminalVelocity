@@ -70,17 +70,18 @@
     </CreateItem>
     <Message Text="MERGING: @(IlmergeAssemblies->'%(Filename)')" Importance="High" />
     <Exec Command="&quot;$(SolutionDir)\packages\ilmerge.2.13.0307\Ilmerge.exe&quot; /out:@(MainAssembly) &quot;@(IntermediateAssembly)&quot; @(IlmergeAssemblies->'&quot;%(FullPath)&quot;', ' ')" />
-    <CreateItem Include="$(OutputPath)*.dll">
+    <!--<CreateItem Include="$(OutputPath)*.dll">
       <Output TaskParameter="Include" ItemName="DeleteAfterBuild" />
     </CreateItem>
     <Delete Files="@(DeleteAfterBuild)" />
     <CreateItem Include="$(OutputPath)*.pdb">
       <Output TaskParameter="Include" ItemName="DeleteAfterBuildMore" />
-    </CreateItem>
+    </CreateItem>-->
     <Delete Files="@(DeleteAfterBuildMore)" />
     <CreateItem Include="$(OutputPath)*.exe.config">
       <Output TaskParameter="Include" ItemName="DeleteAfterBuildEvenMore" />
     </CreateItem>
     <Delete Files="@(DeleteAfterBuildEvenMore)" />
   </Target>
+  <Import Project="$(SolutionDir)\.octopack\OctoPack.targets" />
 </Project>
