@@ -24,6 +24,20 @@ namespace Illumina.TerminalVelocity
                         int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
                         //create the file
                         Stream stream = parameters.GetOutputStream();
+                        if (parameters.FileSize == 0) // Teminate Zero size files
+                        {
+                            if (progress != null)
+                            {
+                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0,
+                                                                                              parameters.FileSize,
+                                                                                              parameters.FileSize, "",
+                                                                                              "",
+                                                                                              null));
+                            }
+                            if (parameters.AutoCloseStream)
+                                stream.Close();
+                            return;
+                        }
                         List<Task> downloadTasks = null;
                         try
                         {
@@ -84,6 +98,13 @@ namespace Illumina.TerminalVelocity
                             }
                           
                         }
+                            catch (Exception e)
+             {
+                // Report Failure
+                progress.Report(
+                    new LargeFileDownloadProgressChangedEventArgs(
+                        100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null,true));
+                            }
                         finally
                         {
                             //kill all the tasks if exist
@@ -224,6 +245,7 @@ namespace Illumina.TerminalVelocity
 
         internal static int GetChunkCount(long fileSize, int chunkSize)
         {
+            if (chunkSize == 0 || fileSize == 0) return 0;
             return (int) (fileSize/chunkSize + (fileSize%chunkSize > 0 ? 1 : 0));
         }
 

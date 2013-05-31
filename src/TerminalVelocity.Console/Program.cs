@@ -50,8 +50,7 @@ namespace Illumina.TerminalVelocity.Host
                         var token = new CancellationToken();
                         var watch = new Stopwatch();
                         watch.Start();
-                        IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress =
-                            new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>(Handler);
+                        IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress =new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>(Handler);
                         var task = parameters.DownloadAsync(token, progress, logger);
                         task.Wait();
                         watch.Stop();

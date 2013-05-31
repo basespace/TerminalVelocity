@@ -44,6 +44,7 @@
     <Compile Include="AsyncProgress.cs" />
     <Compile Include="ByteArrayExtensions.cs" />
     <Compile Include="Downloader.cs" />
+    <Compile Include="SeekableNetworkStream.cs" />
     <Compile Include="ILargeFileDownloadParameters.cs" />
     <Compile Include="ISimpleHttpGetByRangeClient.cs" />
     <Compile Include="LargeFileDownloadCompletedEventArgs.cs" />

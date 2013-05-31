@@ -22,20 +22,20 @@ namespace Illumina.TerminalVelocity.Tests
         {
             Debug.Listeners.Add(new DefaultTraceListener());
         }
-        private string oneGigFileSSl = @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
-        private string oneGigFile = @"http://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
-        private string oneGigChecksum = "290f8099861e8089cec020508a57d2b2";
-        private string twentyChecksum = "11db70c5bd445c4b41de6cde9d655ee8";
-        private string twentyMegFile =
+        public const string ONE_GIG_FILE_S_SL = @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
+        public const string ONE_GIG_FILE = @"http://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
+        public const string ONE_GIG_CHECKSUM = "290f8099861e8089cec020508a57d2b2";
+        public const string TWENTY_CHECKSUM = "11db70c5bd445c4b41de6cde9d655ee8";
+        public const string TWENTY_MEG_FILE =
             @"https://1000genomes.s3.amazonaws.com/release/20100804/ALL.chrX.BI_Beagle.20100804.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425620139&Signature=h%2BIqHbo2%2Bjk0jIbR2qKpE3iS8ts%3D";
-        private string thirtyGigFile = @"https://1000genomes.s3.amazonaws.com/data/HG02484/sequence_read/SRR404082_2.filt.fastq.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1362529020&Signature=l%2BS3sA1vkZeFqlZ7lD5HrQmY5is%3D";
+        public const string THIRTY_GIG_FILE = @"https://1000genomes.s3.amazonaws.com/data/HG02484/sequence_read/SRR404082_2.filt.fastq.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1362529020&Signature=l%2BS3sA1vkZeFqlZ7lD5HrQmY5is%3D";
 
         [Fact]
         public void SimpleGetClientGetsFirst100Bytes()
         {
             var timer = new Stopwatch();
             timer.Start();
-            var uri = new Uri(oneGigFile);
+            var uri = new Uri(ONE_GIG_FILE);
             var client = new SimpleHttpGetByRangeClient(uri);
             var response =client.Get(uri, 0, 100);
             timer.Stop();
@@ -156,10 +156,6 @@ namespace Illumina.TerminalVelocity.Tests
             int next;
             readStack.TryPop(out next);
             Assert.True(next == 0);
-
-
-
-
         }
 
         [Fact]
@@ -229,7 +225,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void ParallelChunkedDownload(int threadCount)
         {
           
-            var uri = new Uri(twentyMegFile);
+            var uri = new Uri(TWENTY_MEG_FILE);
             var path = SafePath("sites_vcf.gz");
             Action<string> logger = ( message) => Trace.WriteLine(message);
             var timer = new Stopwatch();
@@ -240,14 +236,14 @@ namespace Illumina.TerminalVelocity.Tests
             timer.Stop();
             Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
             //try to open the file
-            ValidateGZip(path, parameters.FileSize, twentyChecksum);
+            ValidateGZip(path, parameters.FileSize, TWENTY_CHECKSUM);
         }
 
           [Theory, InlineData(32)]
           public void ParallelChunkedOneGig(int threadCount)
           {
 
-              var uri = new Uri(oneGigFileSSl);
+              var uri = new Uri(ONE_GIG_FILE_S_SL);
               var path = SafePath("sites_vcf.gz");
               Action<string> logger = (message) => Trace.WriteLine(message);
               var timer = new Stopwatch();
@@ -258,7 +254,7 @@ namespace Illumina.TerminalVelocity.Tests
               timer.Stop();
               Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
               //try to open the file
-              ValidateGZip(path, parameters.FileSize, oneGigChecksum);
+              ValidateGZip(path, parameters.FileSize, ONE_GIG_CHECKSUM);
           }
 
         private static void ValidateGZip(string path, long fileSize, string checksum)
@@ -275,7 +271,7 @@ namespace Illumina.TerminalVelocity.Tests
         [Fact]
         public void ValidateSpeedOfWebRequest()
         {
-            var uri = new Uri(twentyMegFile);
+            var uri = new Uri(TWENTY_MEG_FILE);
             var path = SafePath("sites_vcf.gz");
             Action<string> logger = (message) => Trace.WriteLine(message);
             var timer = new Stopwatch();
@@ -284,7 +280,7 @@ namespace Illumina.TerminalVelocity.Tests
             client.DownloadFile(uri, path);
             timer.Stop();
             Debug.WriteLine("Took {0} threads {1} ms", 1, timer.ElapsedMilliseconds);
-            ValidateGZip(path, 29996532, twentyChecksum);
+            ValidateGZip(path, 29996532, TWENTY_CHECKSUM);
             
         }
 
@@ -311,7 +307,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void SimpleGetClientCanDownloadTwentyMegFileSynchronously()
         {
             var timer = new Stopwatch();
-            var uri = new Uri(twentyMegFile);
+            var uri = new Uri(TWENTY_MEG_FILE);
             var client = new SimpleHttpGetByRangeClient(uri);
             var path = SafePath("sites_vcf.gz");
             timer.Start();
@@ -329,7 +325,7 @@ namespace Illumina.TerminalVelocity.Tests
                     SimpleHttpResponse loopResponse;
                     long left = fileSize - currentFileSize;
                     Debug.WriteLine("chunk start {0} length {1} ", currentFileSize, left < chunksize ? left : chunksize);
-                    loopResponse = client.Get(new Uri(twentyMegFile), currentFileSize, left < chunksize ? left : chunksize);
+                    loopResponse = client.Get(new Uri(TWENTY_MEG_FILE), currentFileSize, left < chunksize ? left : chunksize);
                     output.Write(loopResponse.Content, 0, (int)loopResponse.ContentLength);
                     currentFileSize += loopResponse.ContentLength;
                 }

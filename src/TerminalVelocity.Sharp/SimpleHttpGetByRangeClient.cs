@@ -33,6 +33,10 @@ Range: bytes={2}-{3}
             tcpClient = new TcpClient();
         }
 
+        public SimpleHttpResponse Get(long start, long length)
+        {
+            return Get(baseUri, start, length);
+        }
 
         public SimpleHttpResponse Get(Uri uri, long start, long length)
         {
