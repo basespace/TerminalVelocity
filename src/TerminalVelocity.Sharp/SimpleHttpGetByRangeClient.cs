@@ -79,7 +79,7 @@ Range: bytes={2}-{3}
 
             if (!tcpClient.Connected)
             {
-                tcpClient.ReceiveTimeout = 1000*30; //30 seconds
+                tcpClient.ReceiveTimeout = 1000*200; //200 seconds
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
 
                 if (baseUri.Port == 443)

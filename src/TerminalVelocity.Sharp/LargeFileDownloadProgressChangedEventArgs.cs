@@ -5,13 +5,13 @@ namespace Illumina.TerminalVelocity
 
     public class LargeFileDownloadProgressChangedEventArgs : ProgressChangedEventArgs
     {
-        public LargeFileDownloadProgressChangedEventArgs(int progressPercentage, object userState, bool isSuccess = false)
+        public LargeFileDownloadProgressChangedEventArgs(int progressPercentage, object userState, bool isFailed = false)
             : base(progressPercentage, userState)
         {
-            IsFailed = isSuccess;
+            IsFailed = isFailed;
         }
 
-        public LargeFileDownloadProgressChangedEventArgs(int progressPercentage, double downloadBitRate, double writeBitRate, long bytesWritten, long bytesDownloaded, string url, string id, object userState, bool isFailed = false)
+        public LargeFileDownloadProgressChangedEventArgs(int progressPercentage, double downloadBitRate, double writeBitRate, long bytesWritten, long bytesDownloaded, string url, string id, object userState, bool isFailed = false, string reasonForFailure = "")
             : base(progressPercentage, userState)
         {
             this.DownloadBitRate = downloadBitRate;
@@ -21,6 +21,7 @@ namespace Illumina.TerminalVelocity
             this.Url = url;
             this.Id = id;
             IsFailed = isFailed;
+            ReasonForFailure = reasonForFailure;
         }
 
         #region Properties
@@ -60,6 +61,7 @@ namespace Illumina.TerminalVelocity
         /// Download currently successful (if false then the download has failed)
         /// </summary>
         public bool IsFailed { get; private set; }
+        public string ReasonForFailure { get; private set; }
 
         #endregion
     }

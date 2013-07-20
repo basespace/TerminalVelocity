@@ -103,7 +103,7 @@ namespace Illumina.TerminalVelocity
                 // Report Failure
                 progress.Report(
                     new LargeFileDownloadProgressChangedEventArgs(
-                        100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null,true));
+                        100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null,true, e.Message));
                             }
                         finally
                         {
@@ -152,7 +152,7 @@ namespace Illumina.TerminalVelocity
                                      try
                                      {
 
-                                         while (currentChunk >= 0 && tries < 3 &&
+                                         while (currentChunk >= 0 && tries < 4 &&
                                                 !cancellation.Value.IsCancellationRequested) //-1 when we are done
                                          {
                                              logger(string.Format("downloading: {0}", currentChunk));
@@ -196,11 +196,11 @@ namespace Illumina.TerminalVelocity
                                              }
                                              else if (response == null || response.IsStatusCodeRetryable)
                                              {
-                                                 logger(string.Format("sleeping: {0}", currentChunk));
+                                                 int sleepSecs = (int)Math.Pow(4.95, tries);
+                                                 logger(string.Format("sleeping: {0}, {1}s", currentChunk, sleepSecs));
                                                  if (!cancellation.Value.IsCancellationRequested)
                                                  {
-                                                     Thread.Sleep((int) Math.Pow(100, tries));
-                                                     //progressively slow down, don't do this if tries is more than 3 :)
+                                                     Thread.Sleep(sleepSecs * 1000); // 4s, 25s, 120s, 600s
                                                      tries++;
                                                  }
                                              }

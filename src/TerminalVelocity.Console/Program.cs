@@ -55,6 +55,7 @@ namespace Illumina.TerminalVelocity.Host
                         task.Wait();
                         watch.Stop();
                        ClearCurrentConsoleLine();
+
                         Console.WriteLine("done in {0}ms", watch.ElapsedMilliseconds);
                         if (options.IsInteractive)
                         {
@@ -128,6 +129,8 @@ namespace Illumina.TerminalVelocity.Host
         {
             if (progress != null)
             {
+                if (progress.IsFailed)
+                    Console.WriteLine("download failed:{0}", progress.ReasonForFailure);
                 Console.Write("\rpercentComplete {0}%   ", progress.ProgressPercentage);
             }
         }
