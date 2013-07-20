@@ -159,17 +159,22 @@ namespace Illumina.TerminalVelocity
                                              SimpleHttpResponse response = null;
                                              try
                                              {
-                                                 response = client.Get(parameters.Uri,
-                                                                       GetChunkStart(currentChunk,
-                                                                                     parameters.MaxChunkSize),
-                                                                       GetChunkSizeForCurrentChunk(parameters.FileSize,
-                                                                                                   parameters
-                                                                                                       .MaxChunkSize,
-                                                                                                   currentChunk));
+                                                 var dlTask = new Task(() => response = client.Get(parameters.Uri, GetChunkStart(currentChunk, parameters.MaxChunkSize),
+                                                                       GetChunkSizeForCurrentChunk(parameters.FileSize, parameters.MaxChunkSize, currentChunk)));
+                                                 dlTask.Start();
+                                                 // if we're not done within 10 minutes then bail out since that download has something wrong
+                                                 if (!dlTask.Wait(TimeSpan.FromMinutes(10)))
+                                                 {
+                                                     throw new Exception("Get operation cancelled because of a timeout");
+                                                 }
                                              }
                                              catch (Exception e)
                                              {
-                                                 logger(e.Message);
+                                                 if (e.InnerException != null)
+                                                     logger(e.InnerException.Message);
+                                                 else
+                                                     logger(e.Message);
+
                                                  ExecuteAndSquash(client.Dispose);
                                                  client = clientFactory(parameters);
                                              }
