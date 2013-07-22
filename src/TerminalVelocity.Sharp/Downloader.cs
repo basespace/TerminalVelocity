@@ -163,7 +163,7 @@ namespace Illumina.TerminalVelocity
                                                                        GetChunkSizeForCurrentChunk(parameters.FileSize, parameters.MaxChunkSize, currentChunk)));
                                                  dlTask.Start();
                                                  // if we're not done within 10 minutes then bail out since that download has something wrong
-                                                 if (!dlTask.Wait(TimeSpan.FromMinutes(10)))
+                                                 if (!dlTask.Wait(TimeSpan.FromMinutes(2)))
                                                  {
                                                      throw new Exception("Get operation cancelled because of a timeout");
                                                  }
