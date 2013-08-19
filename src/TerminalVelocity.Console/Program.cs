@@ -8,10 +8,11 @@ namespace Illumina.TerminalVelocity.Host
     {
         private static void Main(string[] args)
         {
-            while (ProcessArgs(args))
+            if (args == null || args.Length == 0)
             {
-                args = Console.ReadLine().Split(new[] {" "}, StringSplitOptions.RemoveEmptyEntries);
+                args = new[] { @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D", @"--file=C:\github\TerminalVelocity\tests\TerminalVelocity.Tests\bin\Debug\sites_vcf.gz", "--mc=10485760", "--mt=32", };
             }
+            ProcessArgs(args);
         }
 
         private static bool ProcessArgs(string[] args)

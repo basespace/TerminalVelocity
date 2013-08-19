@@ -24,7 +24,7 @@ namespace Illumina.TerminalVelocity.Tests
         }
         public const string ONE_GIG_FILE_S_SL = @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
         public const string ONE_GIG_FILE = @"http://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
-        public const string ONE_GIG_CHECKSUM = "290f8099861e8089cec020508a57d2b2";
+        public const string ONE_GIG_CHECKSUM = "24b9f9d41755b841eaf8d0faeab00a6c";//24b9f9d41755b841eaf8d0faeab00a6c
         public const string TWENTY_CHECKSUM = "11db70c5bd445c4b41de6cde9d655ee8";
         public const string TWENTY_MEG_FILE =
             @"https://1000genomes.s3.amazonaws.com/release/20100804/ALL.chrX.BI_Beagle.20100804.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425620139&Signature=h%2BIqHbo2%2Bjk0jIbR2qKpE3iS8ts%3D";
@@ -42,7 +42,7 @@ namespace Illumina.TerminalVelocity.Tests
             Debug.WriteLine(string.Format("total {0}ms or {1}secs", timer.ElapsedMilliseconds, timer.ElapsedMilliseconds/1000));
             Assert.NotNull(response);
             Assert.True(response.ContentLength == 100);
-            Assert.True(response.ContentRangeLength == 1284396333);
+            Assert.True(response.ContentRangeLength == 1297662912);
             Assert.True(response.ContentRangeStart == 0);
             Assert.True(response.ContentRangeStop == 99);
             Assert.True(response.StatusCode == 206);
@@ -77,6 +77,13 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.True(chunkSize == maxChunkSize);
         }
 
+
+        [Theory, InlineData(16 * 1024, 61), InlineData(0, 61), InlineData(2, 61), InlineData(1024, 61), InlineData(128 * 1024, 62), InlineData(1024 * 1024, 77)]
+        public void ExpectedDownloadTimeCalculation(int chunkSize, int expected)
+        {
+            Assert.Equal( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
+        }
+
         [Fact]
         public void ThrottleDownloadWhenQueueIsFull()
         {
@@ -100,7 +107,7 @@ namespace Illumina.TerminalVelocity.Tests
                                                 return true;
                                             };
 
-            var task = Downloader.CreateDownloadTask(parameters, dict,e, readStack, shouldSlw, clientFactory: (x) => mockClient.Object );
+            var task = Downloader.CreateDownloadTask(parameters, dict,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
             task.Start();
             task.Wait(2000);
             try
@@ -140,7 +147,7 @@ namespace Illumina.TerminalVelocity.Tests
             try
             {
                 var ct = new CancellationTokenSource();
-                var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw,
+                var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
                                                          clientFactory: (x) => mockClient.Object, cancellation: ct.Token);
                 task.Start();
                 task.Wait(5000);
@@ -186,7 +193,7 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             
-            var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw, clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
@@ -242,13 +249,12 @@ namespace Illumina.TerminalVelocity.Tests
           [Theory, InlineData(32)]
           public void ParallelChunkedOneGig(int threadCount)
           {
-
               var uri = new Uri(ONE_GIG_FILE_S_SL);
               var path = SafePath("sites_vcf.gz");
               Action<string> logger = (message) => Trace.WriteLine(message);
               var timer = new Stopwatch();
               timer.Start();
-              ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1284396333, maxThreads: threadCount);
+              ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,  1297662912,  maxThreads: threadCount);
               Task task = parameters.DownloadAsync(logger: logger);
               task.Wait(TimeSpan.FromMinutes(5));
               timer.Stop();
@@ -284,12 +290,23 @@ namespace Illumina.TerminalVelocity.Tests
             
         }
 
+        //[Fact]
+        //public void CheckMd5()
+        //{
+        //    FileInfo info =
+        //        new FileInfo(@"C:\github\TerminalVelocity\tests\TerminalVelocity.Tests\bin\Debug\sites_vcf.gz");
+        //    var length = info.Length;
+        //    string result = Md5SumByProcess(
+        //        @"C:\github\TerminalVelocity\tests\TerminalVelocity.Tests\bin\Debug\ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz");
+        //    Assert.True(result != null);
+        //}
+
         public static string Md5SumByProcess(string file)
         {
             var p = new Process();
             string md5Path = Path.Combine(new DirectoryInfo(Environment.CurrentDirectory).Parent.Parent.Parent.Parent.FullName,"lib","fciv.exe");
             p.StartInfo.FileName = md5Path;
-            p.StartInfo.Arguments = string.Format(@"-add ""{0}""", file);
+            p.StartInfo.Arguments = string.Format(@"-add ""{0}""",file);
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.Start();

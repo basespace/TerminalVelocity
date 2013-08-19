@@ -1,0 +1,23 @@
+﻿<?xml version="1.0"?>
+<package xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <metadata xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <id>TerminalVelocity.Sharp</id>
+    <title>TerminalVelocity.Sharp</title>
+    <version>$version$</version>
+    <authors>Illumina inc.</authors>
+    <owners>Illumina, Greg Roberts</owners>
+    <summary>Illumina BaseSpace IO library</summary>
+    <description>
+     Fast http range request library
+    </description>
+    <projectUrl>https://github.com/basespace/TerminalVelocity</projectUrl>
+    <licenseUrl>https://github.com/basespace/TerminalVelocity/readme.md</licenseUrl>
+    <iconUrl>https://dp6rs6ajp5nvi.cloudfront.net/images/sites/basespace/11052012/home/basespace-brand.png</iconUrl>
+    <tags>Illumina BaseSpace networking http range-request</tags>
+    <language>en-US</language>
+    <copyright>illumina 2013 and contributors</copyright>
+   <dependencies>   
+   </dependencies>
+  </metadata>
+ 
+</package>

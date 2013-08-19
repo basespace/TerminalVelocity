@@ -16,123 +16,125 @@ namespace Illumina.TerminalVelocity
                                          Action<string> logger = null)
         {
             CancellationToken ct = (cancellationToken != null) ? cancellationToken.Value : CancellationToken.None;
-            Task task = Task.Factory.StartNew(
-                () =>
-                    {
-                        //figure out number of chunks
-                        int chunkCount = GetChunkCount(parameters.FileSize, parameters.MaxChunkSize);
-                        int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
-                        //create the file
-                        Stream stream = parameters.GetOutputStream();
-                        if (parameters.FileSize == 0) // Teminate Zero size files
-                        {
-                            if (progress != null)
-                            {
-                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0,
-                                                                                              parameters.FileSize,
-                                                                                              parameters.FileSize, "",
-                                                                                              "",
-                                                                                              null));
-                            }
-                            if (parameters.AutoCloseStream)
-                                stream.Close();
-                            return;
-                        }
-                        List<Task> downloadTasks = null;
-                        try
-                        {
-                          
-                            int currentChunk = 0;
-                            var readStack = new ConcurrentStack<int>();
-                           
-                            //add all of the chunks to the stack
-                            readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
 
-                            // ReSharper disable AccessToModifiedClosure
-                            Func<int, bool> shouldISlow = (int c) => (c - currentChunk) > (numberOfThreads*2);
-                            // ReSharper restore AccessToModifiedClosure
-
-
-                            var contentDic = new ConcurrentDictionary<int, byte[]>(numberOfThreads, 20);
-                            var addEvent = new AutoResetEvent(false);
-
-                             downloadTasks = new List<Task>(numberOfThreads);
-
-                            for (int i = 0; i < numberOfThreads; i++)
-                            {
-                                downloadTasks.Add(CreateDownloadTask(parameters, contentDic, addEvent, readStack,
-                                                                     shouldISlow, logger, ct));
-                            }
-                            //start all the download threads
-                            downloadTasks.ForEach(x => x.Start());
-                          
-                            //start the write loop
-                            while (currentChunk < chunkCount && !ct.IsCancellationRequested)
-                            {
-                                byte[] currentWrittenChunk;
-                                if (contentDic.TryRemove(currentChunk, out currentWrittenChunk))
-                                {
-                                    //retry?
-                                    logger(string.Format("writing: {0}", currentChunk));
-                                    stream.Write(currentWrittenChunk, 0, currentWrittenChunk.Length);
-                                    if (progress != null)
-                                    {
-                                        progress.Report(new LargeFileDownloadProgressChangedEventArgs((int)Math.Round(100 * (currentChunk/(float)chunkCount), 0), null));
-                                    }
-                                    currentChunk++;
-                                }
-                                else
-                                {
-                                    //are any of the treads alive?
-                                    if (downloadTasks.Any(x => x != null && (x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun)))
-                                    {
-                                        //wait for something that was added
-                                        addEvent.WaitOne(100);
-                                        addEvent.Reset();
-                                    }
-                                    else
-                                    {
-                                        throw new Exception("All threads were killed");
-                                    }
-                                }
-                            }
-                          
-                        }
-                            catch (Exception e)
-             {
-                // Report Failure
-                progress.Report(
-                    new LargeFileDownloadProgressChangedEventArgs(
-                        100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null,true, e.Message));
-                            }
-                        finally
-                        {
-                            //kill all the tasks if exist
-                            if (downloadTasks != null)
-                            {
-                                downloadTasks.ForEach(x =>
-                                                          {
-                                                              if (x == null) return;
-
-                                                              ExecuteAndSquash(x.Dispose);
-                                                          });
-                            }
-                            if (parameters.AutoCloseStream)
-                            {
-                                stream.Close();
-                            }
-                        }
-                       
-                    },
-                ct);
+            Task task = Task.Factory.StartNew(() => StartDownloading(ct, parameters, progress, logger), ct);
 
             return task;
+        }
+
+        internal static void StartDownloading(CancellationToken ct, ILargeFileDownloadParameters parameters, IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
+                                         Action<string> logger = null)
+        {
+
+            //figure out number of chunks
+            int chunkCount = GetChunkCount(parameters.FileSize, parameters.MaxChunkSize);
+            int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
+            logger = logger ?? ((s) => { });
+            //create the file
+            Stream stream = parameters.GetOutputStream();
+            if (parameters.FileSize == 0) // Teminate Zero size files
+            {
+                if (progress != null)
+                {
+                    progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0,
+                                                                                  parameters.FileSize,
+                                                                                  parameters.FileSize, "",
+                                                                                  "",
+                                                                                  null));
+                }
+                if (parameters.AutoCloseStream)
+                    stream.Close();
+                return;
+            }
+
+            List<Task> downloadTasks = null;
+            try
+            {
+
+                int currentChunk = 0;
+                var readStack = new ConcurrentStack<int>();
+
+                //add all of the chunks to the stack
+                readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
+
+                // ReSharper disable AccessToModifiedClosure
+                Func<int, bool> shouldISlow = (int c) => (c - currentChunk) > (numberOfThreads * 2);
+                // ReSharper restore AccessToModifiedClosure
+
+
+                var contentDic = new ConcurrentDictionary<int, byte[]>(numberOfThreads, Math.Max(20, 2 * numberOfThreads));
+                var addEvent = new AutoResetEvent(false);
+
+                downloadTasks = new List<Task>(numberOfThreads);
+                int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
+                for (int i = 0; i < numberOfThreads; i++)
+                {
+                    downloadTasks.Add(CreateDownloadTask(parameters, contentDic, addEvent, readStack,
+                                                         shouldISlow, expectedChunkDownloadTime, logger, ct));
+                }
+                //start all the download threads
+                downloadTasks.ForEach(x => x.Start());
+
+                //start the write loop
+                while (currentChunk < chunkCount && !ct.IsCancellationRequested)
+                {
+                    byte[] currentWrittenChunk;
+                    if (contentDic.TryRemove(currentChunk, out currentWrittenChunk))
+                    {
+                        //retry?
+                        logger(string.Format("writing: {0}", currentChunk));
+                        stream.Write(currentWrittenChunk, 0, currentWrittenChunk.Length);
+                        if (progress != null)
+                        {
+                            progress.Report(new LargeFileDownloadProgressChangedEventArgs((int)Math.Round(100 * (currentChunk / (float)chunkCount), 0), null));
+                        }
+                        currentChunk++;
+                    }
+                    else
+                    {
+                        //are any of the treads alive?
+                        if (downloadTasks.Any(x => x != null && (x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun)))
+                        {
+                            //wait for something that was added
+                            addEvent.WaitOne(100);
+                            addEvent.Reset();
+                        }
+                        else
+                        {
+                            throw new Exception("All threads were killed");
+                        }
+                    }
+                }
+
+            }
+            catch (Exception e)
+            {
+                // Report Failure
+                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, true, e.Message));
+            }
+            finally
+            {
+                //kill all the tasks if exist
+                if (downloadTasks != null)
+                {
+                    downloadTasks.ForEach(x =>
+                    {
+                        if (x == null) return;
+
+                        ExecuteAndSquash(x.Dispose);
+                    });
+                }
+                if (parameters.AutoCloseStream)
+                {
+                    stream.Close();
+                }
+            }
         }
 
         internal static Task CreateDownloadTask(ILargeFileDownloadParameters parameters,
                                                 ConcurrentDictionary<int, byte[]> contentDic,
                                                 AutoResetEvent reset, ConcurrentStack<int> readStack ,
-                                                Func<int, bool> shouldSlowDown, Action<string> logger = null,
+                                                Func<int, bool> shouldSlowDown, int expectedChunkTimeInSeconds, Action<string> logger = null,
                                                 CancellationToken? cancellation = null,
                                                 Func<ILargeFileDownloadParameters, ISimpleHttpGetByRangeClient>
                                                     clientFactory = null)
@@ -162,8 +164,8 @@ namespace Illumina.TerminalVelocity
                                                  var dlTask = new Task(() => response = client.Get(parameters.Uri, GetChunkStart(currentChunk, parameters.MaxChunkSize),
                                                                        GetChunkSizeForCurrentChunk(parameters.FileSize, parameters.MaxChunkSize, currentChunk)));
                                                  dlTask.Start();
-                                                 // if we're not done within 10 minutes then bail out since that download has something wrong
-                                                 if (!dlTask.Wait(TimeSpan.FromMinutes(2)))
+                                                 // if we're not done within expected range, then throw
+                                                 if (!dlTask.Wait(TimeSpan.FromSeconds(expectedChunkTimeInSeconds)))
                                                  {
                                                      throw new Exception("Get operation cancelled because of a timeout");
                                                  }
@@ -242,6 +244,15 @@ namespace Illumina.TerminalVelocity
             {
             }
         }
+        
+        internal static int ExpectedDownloadTimeInSeconds(int chunkSize)
+        {
+            //based on average of 1 mbps ~ 1000kbps	122.1 KBps /2 so lets say 60KB per second is minimum
+            //chunksize  1024
+            //leave 10 seconds for latency
+            return Math.Max(1, (int) Math.Round((double) ((chunkSize/1024)/60), 0)) + 60;
+        }
+
 
         internal static long GetChunkStart(int currentChunk, int maxChunkSize)
         {
