@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Xunit;
-using Xunit.Extensions;
+using NUnit.Framework;
+
 
 namespace Illumina.TerminalVelocity.Tests
 {
+    [TestFixture]
     public class HttpParserTests
     {
         public const string SampleHttpResponse = @"HTTP/1.1 200 OK
@@ -52,36 +53,36 @@ Date: Fri, 22 Mar 2013 05:28:37 GMT
 Server: TinyURL/1.6
 
 ";
-        [Fact]
+        [Test]
         public void Redirect301Request()
         {
              byte[] input = Encoding.ASCII.GetBytes(SampleRedirectResponse);
             int statusCode;
             var headers =HttpParser.GetHttpHeaders(input, input.IndexOf(ByteArrayExtensionsTests.BODY_CRLF), out statusCode);
             var response = new SimpleHttpResponse(statusCode, null, headers);
-            Assert.Equal(statusCode, 301);
-            Assert.Equal(response.Location, @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.chr9.phase1_release_v3.20101123.snps_indels_svs.genotypes.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1427000627&Signature=PFrSu5ZXoUl17mCRg3HwDORfkg4%3D");
+            Assert.AreEqual(statusCode, 301);
+            Assert.AreEqual(response.Location, @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.chr9.phase1_release_v3.20101123.snps_indels_svs.genotypes.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1427000627&Signature=PFrSu5ZXoUl17mCRg3HwDORfkg4%3D");
         }
 
-        [Fact]
+        [Test]
         public void CanWeCreateRequestCorrectly()
         {
             Uri uri = new Uri(@"http://google.com");
             var request = SimpleHttpGetByRangeClient.BuildHttpRequest(uri, 0, 100);
             var expected = string.Format(SampleHttpRequest, uri, uri.Host, 0, 99);
-            Assert.Equal(request, expected);
+            Assert.AreEqual(request, expected);
         }
 
-        [Fact]
+        [Test]
         public void CanWeParseHttpStatusCode()
         {
             byte[] input = Encoding.ASCII.GetBytes(SampleHttpResponse);
             int statusCode;
             var result = HttpParser.GetHttpHeaders(input, input.IndexOf(ByteArrayExtensionsTests.BODY_CRLF), out statusCode);
-            Assert.Equal(statusCode, 200);
+            Assert.AreEqual(statusCode, 200);
         }
 
-        [Fact]
+        [Test]
         public void CanWeParseHttpStatusAndConvertToInt()
         {
             byte[] input = Encoding.ASCII.GetBytes(SampleHttpResponse);
@@ -93,14 +94,14 @@ Server: TinyURL/1.6
             Assert.True(response.IsStatusCodeRetryable);
         }
 
-       [Theory,
-    InlineData(200,  true, true),
-        InlineData(201, true, true),
-        InlineData(400, false, false),
-        InlineData(413, false, true),
-        InlineData(500,  false, true),
-        InlineData(503, false, true),
-         InlineData(504, false, true)
+       [
+    TestCase(200,  true, true),
+        TestCase(201, true, true),
+        TestCase(400, false, false),
+        TestCase(413, false, true),
+        TestCase(500, false, true),
+        TestCase(503, false, true),
+         TestCase(504, false, true)
         ]
         public void ValidateStatusCodes(  int statusCode, bool isSuccessful, bool isRetryable)
        {
@@ -112,7 +113,7 @@ Server: TinyURL/1.6
         }
 
 
-        [Fact]
+        [Test]
         public void CanWeParseRandomHeaders()
         {
             byte[] input = Encoding.ASCII.GetBytes(SampleHttpResponse);

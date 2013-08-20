@@ -7,15 +7,14 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using ApprovalTests.Reporters;
 using ICSharpCode.SharpZipLib.GZip;
 using Moq;
-using Xunit;
-using Xunit.Extensions;
+using NUnit.Framework;
 
 namespace Illumina.TerminalVelocity.Tests
 {
-    [UseReporter(typeof(VisualStudioReporter))]
+    
+    [TestFixture]
     public class DownloadTests
     {
         public DownloadTests()
@@ -30,7 +29,7 @@ namespace Illumina.TerminalVelocity.Tests
             @"https://1000genomes.s3.amazonaws.com/release/20100804/ALL.chrX.BI_Beagle.20100804.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425620139&Signature=h%2BIqHbo2%2Bjk0jIbR2qKpE3iS8ts%3D";
         public const string THIRTY_GIG_FILE = @"https://1000genomes.s3.amazonaws.com/data/HG02484/sequence_read/SRR404082_2.filt.fastq.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1362529020&Signature=l%2BS3sA1vkZeFqlZ7lD5HrQmY5is%3D";
 
-        [Fact]
+        [Test]
         public void SimpleGetClientGetsFirst100Bytes()
         {
             var timer = new Stopwatch();
@@ -50,7 +49,7 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.True(response.ContentLength == response.Content.Length);
         }
 
-        [Fact]
+        [Test]
         public void ReadStackReturnsSequentially()
         {
             var readStack = new ConcurrentStack<int>();
@@ -65,7 +64,7 @@ namespace Illumina.TerminalVelocity.Tests
            
         }
 
-        [Fact]
+        [Test]
         public void ChunkCalculationsForLargeFiles()
         {
             int maxChunkSize = 5242880;
@@ -77,14 +76,15 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.True(chunkSize == maxChunkSize);
         }
 
+        
+        [TestCase(16 * 1024, 61), TestCase(0,61), TestCase(2, 61), TestCase(1024, 61), TestCase(128*1024, 62), TestCase(1024*1024, 77)]
 
-        [Theory, InlineData(16 * 1024, 61), InlineData(0, 61), InlineData(2, 61), InlineData(1024, 61), InlineData(128 * 1024, 62), InlineData(1024 * 1024, 77)]
-        public void ExpectedDownloadTimeCalculation(int chunkSize, int expected)
+        public void ExpectedDownloadTimeCalculation([Values()] int chunkSize, int expected)
         {
-            Assert.Equal( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
+            Assert.AreEqual( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
         }
 
-        [Fact]
+        [Test]
         public void ThrottleDownloadWhenQueueIsFull()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
@@ -122,7 +122,7 @@ namespace Illumina.TerminalVelocity.Tests
 
         }
 
-        [Fact]
+        [Test]
         public void PutBackOnStackWhenFailed()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
@@ -165,7 +165,7 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.True(next == 0);
         }
 
-        [Fact]
+        [Test]
         public void CancellationTokenWillCancel()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
@@ -204,7 +204,7 @@ namespace Illumina.TerminalVelocity.Tests
 
         }
 
-        [Fact]
+        [Test]
         public void CalculateChunkCalcs()
         {
             long fileSize = 29996532;
@@ -228,7 +228,7 @@ namespace Illumina.TerminalVelocity.Tests
 
         }
 
-          [Theory, InlineData(1), InlineData(2),  InlineData(4),  InlineData(8)]
+          [TestCase(1), TestCase(2),  TestCase(4),  TestCase(8)]
         public void ParallelChunkedDownload(int threadCount)
         {
           
@@ -246,7 +246,7 @@ namespace Illumina.TerminalVelocity.Tests
             ValidateGZip(path, parameters.FileSize, TWENTY_CHECKSUM);
         }
 
-          [Theory, InlineData(32)]
+          [TestCase(32)]
           public void ParallelChunkedOneGig(int threadCount)
           {
               var uri = new Uri(ONE_GIG_FILE_S_SL);
@@ -269,12 +269,12 @@ namespace Illumina.TerminalVelocity.Tests
             {
                 Assert.True(fs.Length == fileSize);
                string actualChecksum = Md5SumByProcess(path);
-                Assert.Equal(checksum, actualChecksum);
+                Assert.AreEqual(checksum, actualChecksum);
 
             }
         }
 
-        [Fact]
+        [Test]
         public void ValidateSpeedOfWebRequest()
         {
             var uri = new Uri(TWENTY_MEG_FILE);
@@ -290,7 +290,7 @@ namespace Illumina.TerminalVelocity.Tests
             
         }
 
-        //[Fact]
+        //[Test]
         //public void CheckMd5()
         //{
         //    FileInfo info =
@@ -320,7 +320,7 @@ namespace Illumina.TerminalVelocity.Tests
 
        
 
-        [Fact]
+        [Test]
         public void SimpleGetClientCanDownloadTwentyMegFileSynchronously()
         {
             var timer = new Stopwatch();

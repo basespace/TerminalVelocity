@@ -1,22 +1,24 @@
 ﻿using System.Text;
-using Xunit;
+using NUnit.Framework;
+
 
 namespace Illumina.TerminalVelocity.Tests
 {
+    [TestFixture]
     public class ByteArrayExtensionsTests
     {
         private static string TestArray = @"Hello
 
 World";
         public static byte[] BODY_CRLF = new byte[] {13, 10, 13, 10};
-        [Fact]
+        [Test]
         public void FindCrLfInByteArray()
         {
           
            byte[] input = Encoding.ASCII.GetBytes(TestArray);
            var index = input.IndexOf(BODY_CRLF);
-            Assert.NotEqual(index, -1);
-            Assert.Equal(index, 5);
+            Assert.AreNotEqual(index, -1);
+            Assert.AreEqual(index, 5);
         }
 
        

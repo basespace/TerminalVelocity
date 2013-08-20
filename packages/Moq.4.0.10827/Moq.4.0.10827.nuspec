@@ -16,10 +16,5 @@
     <copyright>Copyright (c) 2007. Clarius Consulting, Manas Technology Solutions, InSTEDD</copyright>
     <language />
     <tags>tdd mocking mocks unittesting</tags>
-    <references>
-      <reference file="Moq.dll" />
-      <reference file="Castle.Core.dll" />
-      <reference file="Moq.Silverlight.dll" />
-    </references>
   </metadata>
 </package>

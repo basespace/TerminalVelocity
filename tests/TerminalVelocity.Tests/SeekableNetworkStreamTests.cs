@@ -4,14 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
-using Xunit;
+using NUnit.Framework;
+
 
 namespace Illumina.TerminalVelocity.Tests
 {
-   
+   [TestFixture]
     public class SeekableNetworkStreamTests
     {
-        [Fact]
+        [Test]
         public void CanReadTheWholeFile()
         {
             var stream = new SeekableNetworkStream(DownloadTests.TWENTY_MEG_FILE);
@@ -30,7 +31,7 @@ namespace Illumina.TerminalVelocity.Tests
             }
         }
 
-        [Fact]
+        [Test]
         public void CanReadPartsOfFileCorrectly()
         {
             //download file then read different parts of each
