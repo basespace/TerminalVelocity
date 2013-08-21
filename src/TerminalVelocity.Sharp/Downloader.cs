@@ -13,19 +13,19 @@ namespace Illumina.TerminalVelocity
         public static Task DownloadAsync(this ILargeFileDownloadParameters parameters,
                                          CancellationToken? cancellationToken = null,
                                          IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
-                                         Action<string> logger = null)
+                                         Action<string> logger = null, BufferManager bufferManager = null)
         {
             CancellationToken ct = (cancellationToken != null) ? cancellationToken.Value : CancellationToken.None;
-
+            
             Task task = Task.Factory.StartNew(() => StartDownloading(ct, parameters, progress, logger), ct);
 
             return task;
         }
 
         internal static void StartDownloading(CancellationToken ct, ILargeFileDownloadParameters parameters, IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
-                                         Action<string> logger = null)
+                                         Action<string> logger = null, BufferManager bufferManager = null)
         {
-
+            
             //figure out number of chunks
             int chunkCount = GetChunkCount(parameters.FileSize, parameters.MaxChunkSize);
             int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
@@ -64,12 +64,23 @@ namespace Illumina.TerminalVelocity
 
                 var contentDic = new ConcurrentDictionary<int, byte[]>(numberOfThreads, Math.Max(20, 2 * numberOfThreads));
                 var addEvent = new AutoResetEvent(false);
+                if (bufferManager == null)
+                {
 
+                    bufferManager =
+                        new BufferManager(new[]
+                                              {
+                                                  new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE,
+                                                                         (uint) numberOfThreads),
+                                                  new BufferQueueSetting((uint) parameters.MaxChunkSize,
+                                                                         (uint) numberOfThreads)
+                                              });
+                }
                 downloadTasks = new List<Task>(numberOfThreads);
                 int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
                 for (int i = 0; i < numberOfThreads; i++)
                 {
-                    downloadTasks.Add(CreateDownloadTask(parameters, contentDic, addEvent, readStack,
+                    downloadTasks.Add(CreateDownloadTask(bufferManager, parameters, contentDic, addEvent, readStack,
                                                          shouldISlow, expectedChunkDownloadTime, logger, ct));
                 }
                 //start all the download threads
@@ -84,6 +95,7 @@ namespace Illumina.TerminalVelocity
                         //retry?
                         logger(string.Format("writing: {0}", currentChunk));
                         stream.Write(currentWrittenChunk, 0, currentWrittenChunk.Length);
+                        bufferManager.FreeBuffer(currentWrittenChunk);
                         if (progress != null)
                         {
                             progress.Report(new LargeFileDownloadProgressChangedEventArgs((int)Math.Round(100 * (currentChunk / (float)chunkCount), 0), null));
@@ -131,7 +143,7 @@ namespace Illumina.TerminalVelocity
             }
         }
 
-        internal static Task CreateDownloadTask(ILargeFileDownloadParameters parameters,
+        internal static Task CreateDownloadTask(BufferManager bufferManager, ILargeFileDownloadParameters parameters,
                                                 ConcurrentDictionary<int, byte[]> contentDic,
                                                 AutoResetEvent reset, ConcurrentStack<int> readStack ,
                                                 Func<int, bool> shouldSlowDown, int expectedChunkTimeInSeconds, Action<string> logger = null,
@@ -143,7 +155,7 @@ namespace Illumina.TerminalVelocity
             var t = new Task(() =>
                                  {
                                      
-                                     clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri));
+                                     clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri, bufferManager));
                                      logger = logger ?? ((s) => { });
 
                                      ISimpleHttpGetByRangeClient client = clientFactory(parameters);

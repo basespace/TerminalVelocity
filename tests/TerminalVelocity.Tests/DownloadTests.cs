@@ -21,20 +21,13 @@ namespace Illumina.TerminalVelocity.Tests
         {
             Debug.Listeners.Add(new DefaultTraceListener());
         }
-        public const string ONE_GIG_FILE_S_SL = @"https://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
-        public const string ONE_GIG_FILE = @"http://1000genomes.s3.amazonaws.com/release/20110521/ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425600785&Signature=KQ3qGSqFYN0z%2BHMTGLAGLUejtBw%3D";
-        public const string ONE_GIG_CHECKSUM = "24b9f9d41755b841eaf8d0faeab00a6c";//24b9f9d41755b841eaf8d0faeab00a6c
-        public const string TWENTY_CHECKSUM = "11db70c5bd445c4b41de6cde9d655ee8";
-        public const string TWENTY_MEG_FILE =
-            @"https://1000genomes.s3.amazonaws.com/release/20100804/ALL.chrX.BI_Beagle.20100804.sites.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1425620139&Signature=h%2BIqHbo2%2Bjk0jIbR2qKpE3iS8ts%3D";
-        public const string THIRTY_GIG_FILE = @"https://1000genomes.s3.amazonaws.com/data/HG02484/sequence_read/SRR404082_2.filt.fastq.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1362529020&Signature=l%2BS3sA1vkZeFqlZ7lD5HrQmY5is%3D";
-
+       
         [Test]
         public void SimpleGetClientGetsFirst100Bytes()
         {
             var timer = new Stopwatch();
             timer.Start();
-            var uri = new Uri(ONE_GIG_FILE);
+            var uri = new Uri(Constants.ONE_GIG_FILE);
             var client = new SimpleHttpGetByRangeClient(uri);
             var response =client.Get(uri, 0, 100);
             timer.Stop();
@@ -87,7 +80,7 @@ namespace Illumina.TerminalVelocity.Tests
         [Test]
         public void ThrottleDownloadWhenQueueIsFull()
         {
-            var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
+            var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000);
             var dict = new ConcurrentDictionary<int, byte[]>();
             var e = new AutoResetEvent(false);
             
@@ -106,8 +99,8 @@ namespace Illumina.TerminalVelocity.Tests
                                                 timesAskedForSlow++;
                                                 return true;
                                             };
-
-            var task = Downloader.CreateDownloadTask(parameters, dict,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
+            var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
+            var task = Downloader.CreateDownloadTask(bufferManager, parameters, dict,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
             task.Start();
             task.Wait(2000);
             try
@@ -125,7 +118,7 @@ namespace Illumina.TerminalVelocity.Tests
         [Test]
         public void PutBackOnStackWhenFailed()
         {
-            var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
+            var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000);
             var dict = new ConcurrentDictionary<int, byte[]>();
             var e = new AutoResetEvent(false);
 
@@ -146,8 +139,9 @@ namespace Illumina.TerminalVelocity.Tests
             };
             try
             {
+                var bufferManager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize )  });
                 var ct = new CancellationTokenSource();
-                var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
+                var task = Downloader.CreateDownloadTask(bufferManager, parameters, dict, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
                                                          clientFactory: (x) => mockClient.Object, cancellation: ct.Token);
                 task.Start();
                 task.Wait(5000);
@@ -168,7 +162,7 @@ namespace Illumina.TerminalVelocity.Tests
         [Test]
         public void CancellationTokenWillCancel()
         {
-            var parameters = new LargeFileDownloadParameters(new Uri(@"http://www.google.com"), "blah", 1000);
+            var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000, verifyLength: false);
             var dict = new ConcurrentDictionary<int, byte[]>();
             var e = new AutoResetEvent(false);
 
@@ -192,8 +186,8 @@ namespace Illumina.TerminalVelocity.Tests
                 return false;
             };
             var tokenSource = new CancellationTokenSource();
-            
-            var task = Downloader.CreateDownloadTask(parameters, dict, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
+            var task = Downloader.CreateDownloadTask(bufferManager, parameters, dict, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
@@ -232,7 +226,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void ParallelChunkedDownload(int threadCount)
         {
           
-            var uri = new Uri(TWENTY_MEG_FILE);
+            var uri = new Uri(Constants.TWENTY_MEG_FILE);
             var path = SafePath("sites_vcf.gz");
             Action<string> logger = ( message) => Trace.WriteLine(message);
             var timer = new Stopwatch();
@@ -243,24 +237,25 @@ namespace Illumina.TerminalVelocity.Tests
             timer.Stop();
             Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
             //try to open the file
-            ValidateGZip(path, parameters.FileSize, TWENTY_CHECKSUM);
+            ValidateGZip(path, parameters.FileSize, Constants.TWENTY_CHECKSUM);
         }
 
           [TestCase(32)]
           public void ParallelChunkedOneGig(int threadCount)
           {
-              var uri = new Uri(ONE_GIG_FILE_S_SL);
+              var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
               var path = SafePath("sites_vcf.gz");
               Action<string> logger = (message) => Trace.WriteLine(message);
               var timer = new Stopwatch();
               timer.Start();
+              var manager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount),new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE)  });
               ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,  1297662912,  maxThreads: threadCount);
-              Task task = parameters.DownloadAsync(logger: logger);
+              Task task = parameters.DownloadAsync(logger: logger, bufferManager:manager);
               task.Wait(TimeSpan.FromMinutes(5));
               timer.Stop();
               Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
               //try to open the file
-              ValidateGZip(path, parameters.FileSize, ONE_GIG_CHECKSUM);
+              ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
           }
 
         private static void ValidateGZip(string path, long fileSize, string checksum)
@@ -277,7 +272,7 @@ namespace Illumina.TerminalVelocity.Tests
         [Test]
         public void ValidateSpeedOfWebRequest()
         {
-            var uri = new Uri(TWENTY_MEG_FILE);
+            var uri = new Uri(Constants.TWENTY_MEG_FILE);
             var path = SafePath("sites_vcf.gz");
             Action<string> logger = (message) => Trace.WriteLine(message);
             var timer = new Stopwatch();
@@ -286,7 +281,7 @@ namespace Illumina.TerminalVelocity.Tests
             client.DownloadFile(uri, path);
             timer.Stop();
             Debug.WriteLine("Took {0} threads {1} ms", 1, timer.ElapsedMilliseconds);
-            ValidateGZip(path, 29996532, TWENTY_CHECKSUM);
+            ValidateGZip(path, 29996532, Constants.TWENTY_CHECKSUM);
             
         }
 
@@ -324,7 +319,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void SimpleGetClientCanDownloadTwentyMegFileSynchronously()
         {
             var timer = new Stopwatch();
-            var uri = new Uri(TWENTY_MEG_FILE);
+            var uri = new Uri(Constants.TWENTY_MEG_FILE);
             var client = new SimpleHttpGetByRangeClient(uri);
             var path = SafePath("sites_vcf.gz");
             timer.Start();
@@ -342,7 +337,7 @@ namespace Illumina.TerminalVelocity.Tests
                     SimpleHttpResponse loopResponse;
                     long left = fileSize - currentFileSize;
                     Debug.WriteLine("chunk start {0} length {1} ", currentFileSize, left < chunksize ? left : chunksize);
-                    loopResponse = client.Get(new Uri(TWENTY_MEG_FILE), currentFileSize, left < chunksize ? left : chunksize);
+                    loopResponse = client.Get(new Uri(Constants.TWENTY_MEG_FILE), currentFileSize, left < chunksize ? left : chunksize);
                     output.Write(loopResponse.Content, 0, (int)loopResponse.ContentLength);
                     currentFileSize += loopResponse.ContentLength;
                 }
@@ -364,7 +359,7 @@ namespace Illumina.TerminalVelocity.Tests
             }
         }
 
-        private static string SafePath(string fileName)
+        public static string SafePath(string fileName)
         {
             string path = Path.Combine(Environment.CurrentDirectory,fileName);
             if (File.Exists(path))

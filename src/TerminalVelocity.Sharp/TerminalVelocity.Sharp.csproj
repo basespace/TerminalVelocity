@@ -44,8 +44,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsyncProgress.cs" />
+    <Compile Include="BufferManager.cs" />
     <Compile Include="ByteArrayExtensions.cs" />
+    <Compile Include="ChunkedFile.cs" />
     <Compile Include="Downloader.cs" />
+    <Compile Include="DownloadJobInfo.cs" />
+    <Compile Include="Helpers.cs" />
+    <Compile Include="IFileWriter.cs" />
     <Compile Include="NtfsSparseFile.cs" />
     <Compile Include="SeekableNetworkStream.cs" />
     <Compile Include="ILargeFileDownloadParameters.cs" />

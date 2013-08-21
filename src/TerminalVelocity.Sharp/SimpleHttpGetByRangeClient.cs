@@ -22,15 +22,21 @@ Range: bytes={2}-{3}
 
 ";
         public static readonly byte[] BODY_INDICATOR = new byte[] {13, 10, 13, 10};
-
+        public const int BUFFER_SIZE = 1024*8;
         private readonly TcpClient tcpClient;
         private Uri baseUri;
         private Stream stream;
+        private readonly BufferManager bufferManager;
 
-        public SimpleHttpGetByRangeClient(Uri baseUri)
+        public SimpleHttpGetByRangeClient(Uri baseUri, BufferManager bufferManager = null)
         {
             this.baseUri = baseUri;
             tcpClient = new TcpClient();
+            if (bufferManager == null)
+            {
+                bufferManager = new BufferManager(new[] { new BufferQueueSetting(BUFFER_SIZE, 1) });
+            }
+            this.bufferManager = bufferManager;
         }
 
         public SimpleHttpResponse Get(long start, long length)
@@ -102,7 +108,7 @@ Range: bytes={2}-{3}
 
         public SimpleHttpResponse ParseResult(Stream stream, long length)
         {
-            var buffer = new byte[1024*8];
+            var buffer = bufferManager.GetBuffer(BUFFER_SIZE);
             Dictionary<string, string> headers;
             int statusCode;
             byte[] headerData;
@@ -123,9 +129,10 @@ Range: bytes={2}-{3}
 
             if (statusCode >= 200 && statusCode <= 300)
             {
+
                 long contentLength = long.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
 
-                var dest = new Byte[contentLength];
+                var dest = bufferManager.GetBuffer((uint)contentLength);
                 using (var outputStream = new MemoryStream(dest))
                 {
                     int destPlace = headerData.Length - bodyStarts;
@@ -141,10 +148,11 @@ Range: bytes={2}-{3}
                         outputStream.Write(buffer, 0, bytesread);
                         left -= bytesread;
                     }
-
+                    bufferManager.FreeBuffer(buffer);
                     return new SimpleHttpResponse(statusCode, dest, headers);
                 }
             }
+            bufferManager.FreeBuffer(buffer);
             return new SimpleHttpResponse(statusCode, null, headers);
         }
     }

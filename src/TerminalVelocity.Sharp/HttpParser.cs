@@ -33,8 +33,18 @@ namespace Illumina.TerminalVelocity
 
             for (int i = 1; i < headers.Count(); i++)
             {
-                var headerTag = headers[i].IndexOf(':');
-                response.Add(headers[i].Substring(0, headerTag), headers[i].Substring(headerTag + 1).Trim());
+                int headerTag = headers[i].IndexOf(':');
+                string key = headers[i].Substring(0, headerTag);
+                string value = headers[i].Substring(headerTag + 1).Trim();
+                if (response.ContainsKey(key))
+                {
+                    response[key] += ";" + headers[i].Substring(headerTag + 1).Trim();
+                }
+                else
+                {
+                    response.Add(key, value);
+                }
+                
             }
             return response;
         }

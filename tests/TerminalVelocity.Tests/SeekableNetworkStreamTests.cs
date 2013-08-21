@@ -15,7 +15,7 @@ namespace Illumina.TerminalVelocity.Tests
         [Test]
         public void CanReadTheWholeFile()
         {
-            var stream = new SeekableNetworkStream(DownloadTests.TWENTY_MEG_FILE);
+            var stream = new SeekableNetworkStream(Constants.TWENTY_MEG_FILE);
             byte[] source = new byte[stream.Length];
             stream.Read(source, 0, (int)stream.Length);
             string tempFile = Path.GetTempFileName();
@@ -23,7 +23,7 @@ namespace Illumina.TerminalVelocity.Tests
             {
                 File.WriteAllBytes(tempFile, source);
                 string checkSum = DownloadTests.Md5SumByProcess(tempFile);
-                Assert.True(checkSum == DownloadTests.TWENTY_CHECKSUM);
+                Assert.True(checkSum == Constants.TWENTY_CHECKSUM);
             }
             finally
             {
@@ -39,14 +39,14 @@ namespace Illumina.TerminalVelocity.Tests
             try
             {
 
-                new WebClient().DownloadFile(DownloadTests.TWENTY_MEG_FILE, tempFile);
+                new WebClient().DownloadFile(Constants.TWENTY_MEG_FILE, tempFile);
                 byte[] expected;
                 using (var binaryReader = new BinaryReader(File.OpenRead(tempFile)))
                 {
                     binaryReader.BaseStream.Position = 100;
                     expected = binaryReader.ReadBytes(5);
                 }
-                var stream = new SeekableNetworkStream(DownloadTests.TWENTY_MEG_FILE);
+                var stream = new SeekableNetworkStream(Constants.TWENTY_MEG_FILE);
                 var actual = new byte[5];
                 stream.Seek(100, SeekOrigin.Begin);
                 stream.Read(actual, 0, 5);

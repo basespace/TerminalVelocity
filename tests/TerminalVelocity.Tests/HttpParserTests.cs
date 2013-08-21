@@ -53,6 +53,20 @@ Date: Fri, 22 Mar 2013 05:28:37 GMT
 Server: TinyURL/1.6
 
 ";
+
+        private const string SampleRedirectWithMultipleCookiesResponse = @"HTTP/1.1 301 Moved Permanently
+X-Powered-By: PHP/5.4.13
+Set-Cookie: tinyUUID=14bec0ab026ecebe48cd53f4; expires=Sat, 22-Mar-2014 05:28:37 GMT; path=/; domain=.tinyurl.com
+Location: https://1000genomes.s3.amazonaws.com/release/20110521/ALL.chr9.phase1_release_v3.20101123.snps_indels_svs.genotypes.vcf.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1427000627&Signature=PFrSu5ZXoUl17mCRg3HwDORfkg4%3D
+Set-Cookie: blah=14bec0ab026ecebe48cd53f4; hello=Sat, 22-Mar-2014 05:28:37 GMT; 
+X-tiny: db 0.040312051773071
+Content-type: text/html
+Content-Length: 0
+Connection: close
+Date: Fri, 22 Mar 2013 05:28:37 GMT
+Server: TinyURL/1.6
+
+";
         [Test]
         public void Redirect301Request()
         {
@@ -94,7 +108,20 @@ Server: TinyURL/1.6
             Assert.True(response.IsStatusCodeRetryable);
         }
 
-       [
+        [Test]
+        public void MultipleHeadersWithTheSameKey()
+        {
+            byte[] input = Encoding.ASCII.GetBytes(SampleRedirectWithMultipleCookiesResponse);
+            int statusCode;
+            var result = HttpParser.GetHttpHeaders(input, input.IndexOf(ByteArrayExtensionsTests.BODY_CRLF),
+                                                   out statusCode);
+            var response = new SimpleHttpResponse(statusCode, input, result);
+            Assert.True(response.StatusCode == 301);
+
+            Assert.True(response.Headers["Set-Cookie"].Contains("blah"));
+        }
+
+        [
     TestCase(200,  true, true),
         TestCase(201, true, true),
         TestCase(400, false, false),
