@@ -46,7 +46,7 @@
     <Compile Include="AsyncProgress.cs" />
     <Compile Include="BufferManager.cs" />
     <Compile Include="ByteArrayExtensions.cs" />
-    <Compile Include="ChunkedFile.cs" />
+    <Compile Include="ChunkedFilePart.cs" />
     <Compile Include="Downloader.cs" />
     <Compile Include="DownloadJobInfo.cs" />
     <Compile Include="Helpers.cs" />

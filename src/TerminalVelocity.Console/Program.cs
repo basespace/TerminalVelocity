@@ -56,7 +56,7 @@ namespace Illumina.TerminalVelocity.Host
                         watch.Stop();
                        ClearCurrentConsoleLine();
 
-                        Console.WriteLine("done in {0}ms", watch.ElapsedMilliseconds);
+                        Console.WriteLine("done in {0}ms ({1}m {2}s {3}ms", watch.ElapsedMilliseconds, watch.Elapsed.Minutes, watch.Elapsed.Seconds, watch.Elapsed.Milliseconds);
                         if (options.IsInteractive)
                         {
                             return true;

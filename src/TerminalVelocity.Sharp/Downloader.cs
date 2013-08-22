@@ -51,18 +51,20 @@ namespace Illumina.TerminalVelocity
             try
             {
 
-                int currentChunk = 0;
+                int writtenChunk = 0;
                 var readStack = new ConcurrentStack<int>();
 
                 //add all of the chunks to the stack
                 readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
 
+               
+
+
+                var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
+
                 // ReSharper disable AccessToModifiedClosure
-                Func<int, bool> shouldISlow = (int c) => (c - currentChunk) > (numberOfThreads * 2);
+                Func<int, bool> shouldISlow = (int c) => writeQueue.Count > 30;
                 // ReSharper restore AccessToModifiedClosure
-
-
-                var contentDic = new ConcurrentDictionary<int, byte[]>(numberOfThreads, Math.Max(20, 2 * numberOfThreads));
                 var addEvent = new AutoResetEvent(false);
                 if (bufferManager == null)
                 {
@@ -80,27 +82,29 @@ namespace Illumina.TerminalVelocity
                 int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
                 for (int i = 0; i < numberOfThreads; i++)
                 {
-                    downloadTasks.Add(CreateDownloadTask(bufferManager, parameters, contentDic, addEvent, readStack,
+                    downloadTasks.Add(CreateDownloadTask(bufferManager, parameters, writeQueue, addEvent, readStack,
                                                          shouldISlow, expectedChunkDownloadTime, logger, ct));
                 }
                 //start all the download threads
                 downloadTasks.ForEach(x => x.Start());
 
                 //start the write loop
-                while (currentChunk < chunkCount && !ct.IsCancellationRequested)
+                while (writtenChunk < chunkCount && !ct.IsCancellationRequested)
                 {
-                    byte[] currentWrittenChunk;
-                    if (contentDic.TryRemove(currentChunk, out currentWrittenChunk))
+                  
+                    ChunkedFilePart part;
+                    if (writeQueue.TryDequeue(out part))
                     {
                         //retry?
-                        logger(string.Format("writing: {0}", currentChunk));
-                        stream.Write(currentWrittenChunk, 0, currentWrittenChunk.Length);
-                        bufferManager.FreeBuffer(currentWrittenChunk);
+                        logger(string.Format("writing: {0}", writtenChunk));
+                        stream.Position = part.FileOffset;
+                        stream.Write(part.Content,0, part.Length);
+                        bufferManager.FreeBuffer(part.Content);
                         if (progress != null)
                         {
-                            progress.Report(new LargeFileDownloadProgressChangedEventArgs((int)Math.Round(100 * (currentChunk / (float)chunkCount), 0), null));
+                            progress.Report(new LargeFileDownloadProgressChangedEventArgs((int)Math.Round(100 * (writtenChunk / (float)chunkCount), 0), null));
                         }
-                        currentChunk++;
+                        writtenChunk++;
                     }
                     else
                     {
@@ -144,7 +148,7 @@ namespace Illumina.TerminalVelocity
         }
 
         internal static Task CreateDownloadTask(BufferManager bufferManager, ILargeFileDownloadParameters parameters,
-                                                ConcurrentDictionary<int, byte[]> contentDic,
+                                                ConcurrentQueue<ChunkedFilePart> writeQueue,
                                                 AutoResetEvent reset, ConcurrentStack<int> readStack ,
                                                 Func<int, bool> shouldSlowDown, int expectedChunkTimeInSeconds, Action<string> logger = null,
                                                 CancellationToken? cancellation = null,
@@ -159,7 +163,7 @@ namespace Illumina.TerminalVelocity
                                      logger = logger ?? ((s) => { });
 
                                      ISimpleHttpGetByRangeClient client = clientFactory(parameters);
-                                     int currentChunk = -1;
+                                     int currentChunk;
                                      readStack.TryPop(out currentChunk);
                                      int tries = 0;
 
@@ -171,10 +175,14 @@ namespace Illumina.TerminalVelocity
                                          {
                                              logger(string.Format("downloading: {0}", currentChunk));
                                              SimpleHttpResponse response = null;
+                                              var part = new ChunkedFilePart();
+                                             part.FileOffset =  GetChunkStart(currentChunk, parameters.MaxChunkSize);
+                                             part.Length = GetChunkSizeForCurrentChunk(parameters.FileSize,
+                                                                                       parameters.MaxChunkSize,
+                                                                                       currentChunk);
                                              try
                                              {
-                                                 var dlTask = new Task(() => response = client.Get(parameters.Uri, GetChunkStart(currentChunk, parameters.MaxChunkSize),
-                                                                       GetChunkSizeForCurrentChunk(parameters.FileSize, parameters.MaxChunkSize, currentChunk)));
+                                                 var dlTask = new Task(() => response = client.Get(parameters.Uri,part.FileOffset, part.Length));
                                                  dlTask.Start();
                                                  // if we're not done within expected range, then throw
                                                  if (!dlTask.Wait(TimeSpan.FromSeconds(expectedChunkTimeInSeconds)))
@@ -195,8 +203,10 @@ namespace Illumina.TerminalVelocity
 
                                              if (response != null && response.WasSuccessful)
                                              {
-                                                 contentDic.AddOrUpdate(currentChunk, response.Content,
-                                                                        (i, bytes) => response.Content);
+
+                                                 part.Content = response.Content;
+                                                 writeQueue.Enqueue(part);
+
                                                  tries = 0;
                                                  logger(string.Format("downloaded: {0}", currentChunk));
                                                  reset.Set();

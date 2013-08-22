@@ -81,7 +81,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void ThrottleDownloadWhenQueueIsFull()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000);
-            var dict = new ConcurrentDictionary<int, byte[]>();
+            var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
             var e = new AutoResetEvent(false);
             
             byte[] sampleResponse = Encoding.UTF8.GetBytes("hello world");
@@ -100,7 +100,7 @@ namespace Illumina.TerminalVelocity.Tests
                                                 return true;
                                             };
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = Downloader.CreateDownloadTask(bufferManager, parameters, dict,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
+            var task = Downloader.CreateDownloadTask(bufferManager, parameters,writeQueue ,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
             task.Start();
             task.Wait(2000);
             try
@@ -111,7 +111,9 @@ namespace Illumina.TerminalVelocity.Tests
             int next;
             readStack.TryPop(out next);
             Assert.True(next == 2);
-            Assert.True(Encoding.UTF8.GetString(dict[0]) == "hello world");
+            ChunkedFilePart part;
+            writeQueue.TryDequeue(out part);
+            Assert.True(Encoding.UTF8.GetString(part.Content) == "hello world");
 
         }
 
@@ -119,7 +121,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void PutBackOnStackWhenFailed()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000);
-            var dict = new ConcurrentDictionary<int, byte[]>();
+            var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
             var e = new AutoResetEvent(false);
 
             byte[] sampleResponse = Encoding.UTF8.GetBytes("hello world");
@@ -141,7 +143,7 @@ namespace Illumina.TerminalVelocity.Tests
             {
                 var bufferManager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize )  });
                 var ct = new CancellationTokenSource();
-                var task = Downloader.CreateDownloadTask(bufferManager, parameters, dict, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
+                var task = Downloader.CreateDownloadTask(bufferManager, parameters, writeQueue, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
                                                          clientFactory: (x) => mockClient.Object, cancellation: ct.Token);
                 task.Start();
                 task.Wait(5000);
@@ -163,7 +165,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void CancellationTokenWillCancel()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000, verifyLength: false);
-            var dict = new ConcurrentDictionary<int, byte[]>();
+            var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
             var e = new AutoResetEvent(false);
 
             byte[] sampleResponse = Encoding.UTF8.GetBytes("hello world");
@@ -187,7 +189,7 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = Downloader.CreateDownloadTask(bufferManager, parameters, dict, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = Downloader.CreateDownloadTask(bufferManager, parameters, writeQueue, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
@@ -245,7 +247,7 @@ namespace Illumina.TerminalVelocity.Tests
           {
               var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
               var path = SafePath("sites_vcf.gz");
-              Action<string> logger = (message) => Trace.WriteLine(message);
+              Action<string> logger = (message) => { };
               var timer = new Stopwatch();
               timer.Start();
               var manager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount),new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE)  });
