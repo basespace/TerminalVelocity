@@ -243,6 +243,7 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
           [TestCase(32)]
+        [NUnit.Framework.Ignore]
           public void ParallelChunkedOneGig(int threadCount)
           {
               var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
