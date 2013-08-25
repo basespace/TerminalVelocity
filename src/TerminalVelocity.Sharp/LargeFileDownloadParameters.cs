@@ -65,6 +65,18 @@ namespace Illumina.TerminalVelocity
         protected static FileStream CreateOutputStream(string filePath, long fileLength, bool deleteIfExists = false)
         {
            
+            EnsureCleanFile(filePath, deleteIfExists);
+            //first try to create a sparse file (only important on windows, this will be ignored elsewhere
+            SparseFile.CreateSparse(filePath, fileLength);
+           
+            var stream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+           //we are pre-allocating hence the above call to SparseFile
+             stream.SetLength(fileLength);
+            return stream;
+        }
+
+        internal static void EnsureCleanFile(string filePath, bool deleteIfExists)
+        {
             if ((File.Exists(filePath) && deleteIfExists) || !File.Exists(filePath))
             {
                 if (File.Exists(filePath))
@@ -77,13 +89,6 @@ namespace Illumina.TerminalVelocity
                     Directory.CreateDirectory(directory);
                 }
             }
-            //first try to create a sparse file (only important on windows, this will be ignored elsewhere
-            SparseFile.CreateSparse(filePath, fileLength);
-           
-            var stream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-           //we are pre-allocating hence the above call to SparseFile
-             stream.SetLength(fileLength);
-            return stream;
         }
     }
 

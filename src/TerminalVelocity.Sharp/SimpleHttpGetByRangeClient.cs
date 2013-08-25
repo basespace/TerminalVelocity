@@ -23,12 +23,15 @@ Range: bytes={2}-{3}
 ";
         public static readonly byte[] BODY_INDICATOR = new byte[] {13, 10, 13, 10};
         public const int BUFFER_SIZE = 1024*8;
+        public const int DEFAULT_TIMEOUT = 1000 * 200; //200 seconds
         private readonly TcpClient tcpClient;
         private Uri baseUri;
         private Stream stream;
         private readonly BufferManager bufferManager;
+        private int timeout;
+        
 
-        public SimpleHttpGetByRangeClient(Uri baseUri, BufferManager bufferManager = null)
+        public SimpleHttpGetByRangeClient(Uri baseUri, BufferManager bufferManager = null, int timeout = DEFAULT_TIMEOUT)
         {
             this.baseUri = baseUri;
             tcpClient = new TcpClient();
@@ -37,6 +40,7 @@ Range: bytes={2}-{3}
                 bufferManager = new BufferManager(new[] { new BufferQueueSetting(BUFFER_SIZE, 1) });
             }
             this.bufferManager = bufferManager;
+            this.timeout = timeout;
         }
 
         public SimpleHttpResponse Get(long start, long length)
@@ -85,7 +89,7 @@ Range: bytes={2}-{3}
 
             if (!tcpClient.Connected)
             {
-                tcpClient.ReceiveTimeout = 1000*200; //200 seconds
+                tcpClient.ReceiveTimeout =timeout; //200 seconds
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
 
                 if (baseUri.Port == 443)

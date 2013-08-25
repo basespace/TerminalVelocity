@@ -51,6 +51,7 @@
     <Compile Include="DownloadJobInfo.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="IFileWriter.cs" />
+    <Compile Include="LargeFileDownloadWithStreamParameters.cs" />
     <Compile Include="NtfsSparseFile.cs" />
     <Compile Include="SeekableNetworkStream.cs" />
     <Compile Include="ILargeFileDownloadParameters.cs" />

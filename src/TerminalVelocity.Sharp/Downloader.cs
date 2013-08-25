@@ -251,7 +251,7 @@ namespace Illumina.TerminalVelocity
                                              ExecuteAndSquash(client.Dispose);
                                          }
                                      }
-
+                                     logger("Thread {0} done" + Thread.CurrentThread.ManagedThreadId);
                                  }, cancellation.Value);
             return t;
         }

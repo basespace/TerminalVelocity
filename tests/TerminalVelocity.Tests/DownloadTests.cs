@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -242,8 +243,38 @@ namespace Illumina.TerminalVelocity.Tests
             ValidateGZip(path, parameters.FileSize, Constants.TWENTY_CHECKSUM);
         }
 
-          [TestCase(32)]
-        [NUnit.Framework.Ignore]
+          [TestCase(2, 2), TestCase(2, 5)]
+          public void MultipleParallelChunkedDownload(int threadCount, int parallelFactor)
+          {
+              Action<string> download = (prefix) => {
+                                          var uri = new Uri(Constants.TWENTY_MEG_FILE);
+                                          var path = SafePath(prefix +"sites_vcf.gz");
+                                          Action<string> logger = (message) => Trace.WriteLine(message);
+                                          var timer = new Stopwatch();
+                                          timer.Start();
+                                          ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(
+                                              uri, path, 29996532, maxThreads: threadCount);
+                                          Task task = parameters.DownloadAsync(logger: logger);
+                                          task.Wait(TimeSpan.FromMinutes(5));
+                                          timer.Stop();
+                                          Debug.WriteLine("Took {0} threads {1} ms", threadCount,
+                                                          timer.ElapsedMilliseconds);
+                                          //try to open the file
+                                          ValidateGZip(path, parameters.FileSize, Constants.TWENTY_CHECKSUM);
+               
+              };
+              var tasks = new List<Task>();
+              for (int i = 0; i < parallelFactor; i++)
+              {
+                  int i1 = i;
+                  Task t = Task.Factory.StartNew(() => download(i1.ToString()));
+                  tasks.Add(t);
+              }
+              Task.WaitAll(tasks.ToArray());
+
+          }
+
+          [TestCase(32, Category = "time-consuming")]
           public void ParallelChunkedOneGig(int threadCount)
           {
               var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
@@ -254,14 +285,14 @@ namespace Illumina.TerminalVelocity.Tests
               var manager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount),new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE)  });
               ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,  1297662912,  maxThreads: threadCount);
               Task task = parameters.DownloadAsync(logger: logger, bufferManager:manager);
-              task.Wait(TimeSpan.FromMinutes(5));
+              task.Wait(TimeSpan.FromMinutes(15));
               timer.Stop();
               Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
               //try to open the file
               ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
           }
 
-        private static void ValidateGZip(string path, long fileSize, string checksum)
+        internal static void ValidateGZip(string path, long fileSize, string checksum)
         {
             using (Stream fs = File.OpenRead(path))
             {
