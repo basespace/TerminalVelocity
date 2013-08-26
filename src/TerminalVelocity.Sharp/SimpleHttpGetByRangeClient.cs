@@ -24,7 +24,7 @@ Range: bytes={2}-{3}
         public static readonly byte[] BODY_INDICATOR = new byte[] {13, 10, 13, 10};
         public const int BUFFER_SIZE = 1024*8;
         public const int DEFAULT_TIMEOUT = 1000 * 200; //200 seconds
-        private readonly TcpClient tcpClient;
+        private TcpClient tcpClient;
         private Uri baseUri;
         private Stream stream;
         private readonly BufferManager bufferManager;
@@ -72,9 +72,22 @@ Range: bytes={2}-{3}
             }
         }
 
+        public int ConnectionTimeout
+        {
+            get { return timeout; }
+            set
+            {
+                if (tcpClient != null)
+                {
+                    tcpClient.ReceiveTimeout = value;
+                }
+                timeout = value;
+            }
+        }
+
         protected void EnsureConnection(Uri uri)
         {
-            if (uri.Host != baseUri.Host)
+            if (uri.Host != baseUri.Host || (tcpClient.Connected && stream == null) )
             {
                 if (stream != null)
                 {
@@ -83,15 +96,17 @@ Range: bytes={2}-{3}
                 if (tcpClient.Connected)
                 {
                     tcpClient.Close();
+                    tcpClient = new TcpClient();
+                    
                 }
                 baseUri = uri;
             }
 
             if (!tcpClient.Connected)
             {
-                tcpClient.ReceiveTimeout =timeout; //200 seconds
+                
+                tcpClient.ReceiveTimeout =timeout; 
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
-
                 if (baseUri.Port == 443)
                 {
                     var sslStream = new SslStream(tcpClient.GetStream());
@@ -103,7 +118,9 @@ Range: bytes={2}-{3}
                     stream = tcpClient.GetStream();
                 }
             }
+           
         }
+
 
         internal static string BuildHttpRequest(Uri uri, long start, long length)
         {

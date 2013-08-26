@@ -159,7 +159,7 @@ namespace Illumina.TerminalVelocity
             var t = new Task(() =>
                                  {
                                      
-                                     clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri, bufferManager));
+                                     clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri, bufferManager, expectedChunkTimeInSeconds * 1000 ));
                                      logger = logger ?? ((s) => { });
 
                                      ISimpleHttpGetByRangeClient client = clientFactory(parameters);
@@ -182,13 +182,7 @@ namespace Illumina.TerminalVelocity
                                                                                        currentChunk);
                                              try
                                              {
-                                                 var dlTask = new Task(() => response = client.Get(parameters.Uri,part.FileOffset, part.Length));
-                                                 dlTask.Start();
-                                                 // if we're not done within expected range, then throw
-                                                 if (!dlTask.Wait(TimeSpan.FromSeconds(expectedChunkTimeInSeconds)))
-                                                 {
-                                                     throw new Exception("Get operation cancelled because of a timeout");
-                                                 }
+                                                 response = client.Get(parameters.Uri, part.FileOffset, part.Length);
                                              }
                                              catch (Exception e)
                                              {
@@ -251,7 +245,7 @@ namespace Illumina.TerminalVelocity
                                              ExecuteAndSquash(client.Dispose);
                                          }
                                      }
-                                     logger("Thread {0} done" + Thread.CurrentThread.ManagedThreadId);
+                                     logger(String.Format("Thread {0} done" ,Thread.CurrentThread.ManagedThreadId));
                                  }, cancellation.Value);
             return t;
         }
