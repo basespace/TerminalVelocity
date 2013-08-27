@@ -31,14 +31,18 @@ namespace Illumina.TerminalVelocity
             {
                 Id = Guid.NewGuid().ToString().Replace("-", "");
             }
+            else
+            {
+                Id = id;
+            }
 
             OutputFile = outputFile;
-            MaxChunkSize = fileSize > maxChunkSize ? maxChunkSize : (int)fileSize;
             MaxRetries = 3;
             fileStream = new Lazy<FileStream>(() => CreateOutputStream(outputFile, fileSize));
             MaxThreads = maxThreads;
             AutoCloseStream = autoCloseStream;
             FileSize = verifyLength ? GetFileSizeFromSource(uri) : fileSize;
+            MaxChunkSize = FileSize > maxChunkSize ? maxChunkSize : (int)FileSize;
 
         }
 

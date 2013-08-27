@@ -71,9 +71,8 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
         
-        [TestCase(16 * 1024, 61), TestCase(0,61), TestCase(2, 61), TestCase(1024, 61), TestCase(128*1024, 62), TestCase(1024*1024, 77)]
-
-        public void ExpectedDownloadTimeCalculation([Values()] int chunkSize, int expected)
+        [TestCase(16 * 1024, 12), TestCase(0,12), TestCase(2, 12), TestCase(1024, 12), TestCase(1024*1024, 80), TestCase(5 * (1024*1024), 400)]
+        public void ExpectedDownloadTimeCalculation(int chunkSize, int expected)
         {
             Assert.AreEqual( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
         }
@@ -322,11 +321,8 @@ namespace Illumina.TerminalVelocity.Tests
         //[Test]
         //public void CheckMd5()
         //{
-        //    FileInfo info =
-        //        new FileInfo(@"C:\github\TerminalVelocity\tests\TerminalVelocity.Tests\bin\Debug\sites_vcf.gz");
-        //    var length = info.Length;
-        //    string result = Md5SumByProcess(
-        //        @"C:\github\TerminalVelocity\tests\TerminalVelocity.Tests\bin\Debug\ALL.wgs.phase1_release_v3.20101123.snps_indels_sv.sites.vcf.gz");
+         
+        //    string result = Md5SumByProcess(@"C:\Users\groberts\Downloads\UnitTestFile_110120");
         //    Assert.True(result != null);
         //}
 
@@ -391,6 +387,75 @@ namespace Illumina.TerminalVelocity.Tests
                     }
                 }
             }
+        }
+
+        [Test]
+        public void DownloadSmallerFile()
+        {
+            //8 threads
+            //MaxChunkSize = 1048576
+            //FileSize = 5242880
+           
+            var uri = new Uri(Constants.FIVE_MEG_FILE);
+            var path = SafePath("sites_vcf.gz");
+            Action<string> logger = (message) => { };
+            var timer = new Stopwatch();
+            timer.Start();
+            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, maxThreads: 8);
+            Task task = parameters.DownloadAsync(logger: logger);
+            task.Wait(TimeSpan.FromMinutes(1));
+            timer.Stop();
+            Debug.WriteLine("Took {0} threads {1} ms", 8, timer.ElapsedMilliseconds);
+            //try to open the file
+            ValidateGZip(path, parameters.FileSize, Constants.FIVE_MEG_CHECKSUM);
+        }
+
+        [Test]
+        public void DownloadSmallerFileWriteToStream()
+        {
+            //8 threads
+            //MaxChunkSize = 1048576
+            //FileSize = 5242880
+
+            var uri = new Uri(Constants.FIVE_MEG_FILE);
+            var path = SafePath("sites_vcf.gz");
+            Action<string> logger = (message) => { };
+            var timer = new Stopwatch();
+            timer.Start();
+            using (var fs = new FileStream(path, FileMode.OpenOrCreate))
+            {
+                ILargeFileDownloadParameters parameters = new LargeFileDownloadWithStreamParameters(uri,fs , 1048576,
+                                                                                                    maxThreads: 8);
+                Task task = parameters.DownloadAsync(logger: logger);
+                task.Wait(TimeSpan.FromMinutes(1));
+                timer.Stop();
+                Debug.WriteLine("Took {0} threads {1} ms", 8, timer.ElapsedMilliseconds);
+           
+            //try to open the file
+            ValidateGZip(path, parameters.FileSize, Constants.FIVE_MEG_CHECKSUM);
+                 }
+        }
+
+        [Test]
+        public void DownloadFile()
+        {
+            //8 threads
+            //MaxChunkSize = 1048576
+            //FileSize = 5242880
+
+            var uri = new Uri(@"https://cloud-internal-test.s3.amazonaws.com/fbfabff489004d75a0cba2260129473c/UnitTestFile_111115?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1377728665&Signature=VsNkseAfUfe0PxrfLr0i%2BDQ%2BX1c%3D");
+            var path = SafePath("sites_vcf.gz");
+            Action<string> logger = (message) => { };
+            var timer = new Stopwatch();
+            timer.Start();
+            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, maxThreads: 8);
+            Task task = parameters.DownloadAsync(logger: logger);
+            task.Wait(TimeSpan.FromMinutes(1));
+            timer.Stop();
+            Debug.WriteLine("Took {0} threads {1} ms", 8, timer.ElapsedMilliseconds);
+            //try to open the file
+            var f = new FileInfo(path);
+            Assert.True(f.Length == parameters.FileSize);
         }
 
         public static string SafePath(string fileName)

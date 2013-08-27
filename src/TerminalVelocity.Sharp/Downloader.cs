@@ -25,11 +25,6 @@ namespace Illumina.TerminalVelocity
         internal static void StartDownloading(CancellationToken ct, ILargeFileDownloadParameters parameters, IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
                                          Action<string> logger = null, BufferManager bufferManager = null)
         {
-            
-            //figure out number of chunks
-            int chunkCount = GetChunkCount(parameters.FileSize, parameters.MaxChunkSize);
-            int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
-            logger = logger ?? ((s) => { });
             //create the file
             Stream stream = parameters.GetOutputStream();
             if (parameters.FileSize == 0) // Teminate Zero size files
@@ -46,6 +41,11 @@ namespace Illumina.TerminalVelocity
                     stream.Close();
                 return;
             }
+
+            //figure out number of chunks
+            int chunkCount = GetChunkCount(parameters.FileSize, parameters.MaxChunkSize);
+            int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
+            logger = logger ?? ((s) => { });
 
             List<Task> downloadTasks = null;
             try
@@ -170,7 +170,7 @@ namespace Illumina.TerminalVelocity
                                      try
                                      {
 
-                                         while (currentChunk >= 0 && tries < 4 &&
+                                         while (currentChunk >= 0 && tries < 15 &&
                                                 !cancellation.Value.IsCancellationRequested) //-1 when we are done
                                          {
                                              logger(string.Format("downloading: {0}", currentChunk));
@@ -261,12 +261,16 @@ namespace Illumina.TerminalVelocity
             }
         }
         
-        internal static int ExpectedDownloadTimeInSeconds(int chunkSize)
+        internal static int ExpectedDownloadTimeInSeconds(int chunkSizeInBytes)
         {
-            //based on average of 1 mbps ~ 1000kbps	122.1 KBps /2 so lets say 60KB per second is minimum
-            //chunksize  1024
-            //leave 10 seconds for latency
-            return Math.Max(1, (int) Math.Round((double) ((chunkSize/1024)/60), 0)) + 60;
+            //so lets say 128Kbps per second with no overhead takes 62 seconds for 1MB 64kb = 16384bytes
+            //20% latency
+            //1024bytes in a KB
+            //1048576 bytes in a MB
+
+            int raw = Math.Max(chunkSizeInBytes / 16384, 10);  //lowest is 10 seconds
+            return  raw + ((int) Math.Round(raw * .25, 0));  //add 25% overhead, minimum 10 sec
+
         }
 
 

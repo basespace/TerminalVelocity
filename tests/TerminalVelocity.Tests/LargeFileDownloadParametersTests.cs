@@ -59,5 +59,31 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.AreEqual(1, parameters.FileSize);
         }
 
+        [TestCase(10, 1000, 10)]
+        [TestCase(0, 1000, 0)]
+        [TestCase(2000, 1000, 1000)]
+        public void MaxChunkSizeCalculation(int fileSize, int chunkSize, int expected)
+        {
+            var parameters = new LargeFileDownloadParameters(new Uri("http://blah.com"), "", fileSize, verifyLength: false, maxChunkSize: chunkSize);
+            Assert.AreEqual(expected, parameters.MaxChunkSize);
+        }
+
+        [Test]
+        public void IdIsAssignedWhenSupplied()
+        {
+            var parameters = new LargeFileDownloadParameters(new Uri("http://blah.com"), "", 20, verifyLength: false, maxChunkSize: 1, id:"test");
+            Assert.True(parameters.Id == "test");
+        }
+
+        [Test]
+        public void IdIsAssignedWhenNotSupplied()
+        {
+      
+            var parameters = new LargeFileDownloadParameters(new Uri("http://blah.com"), "", 20, verifyLength: false, maxChunkSize: 1);
+            Assert.NotNull( parameters.Id);
+            Assert.True(parameters.Id.Length > 10);
+      
+        }
+
     }
 }

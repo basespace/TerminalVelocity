@@ -48,5 +48,19 @@ namespace Illumina.TerminalVelocity.Tests
 
 
         }
+
+        [Test]
+        public void ReadMultipleGetsInARow()
+        {
+            int reads = 5;
+            var client = new SimpleHttpGetByRangeClient(new Uri(Constants.ONE_GIG_FILE_S_SL), timeout: 1000 * 10);
+            for (int i = 0; i < reads; i++)
+            {
+                var response = client.Get(i, 1024 * i + 1);//something large
+                Assert.NotNull(response);
+            }
+         
+           
+        }
     }
 }

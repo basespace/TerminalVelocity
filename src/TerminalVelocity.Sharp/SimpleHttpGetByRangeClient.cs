@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
+using System.Linq;
 
 namespace Illumina.TerminalVelocity
 {
@@ -27,20 +28,35 @@ Range: bytes={2}-{3}
         private TcpClient tcpClient;
         private Uri baseUri;
         private Stream stream;
-        private readonly BufferManager bufferManager;
+        private BufferManager bufferManager;
         private int timeout;
-        
+        private Uri proxy;
 
-        public SimpleHttpGetByRangeClient(Uri baseUri, BufferManager bufferManager = null, int timeout = DEFAULT_TIMEOUT)
+        public SimpleHttpGetByRangeClient(Uri baseUri, BufferManager bufferManager = null, int timeout = DEFAULT_TIMEOUT, Uri proxy = null)
         {
             this.baseUri = baseUri;
-            tcpClient = new TcpClient();
+           
+            this.proxy = proxy;
+            CreateTcpClient(proxy);
+
             if (bufferManager == null)
             {
                 bufferManager = new BufferManager(new[] { new BufferQueueSetting(BUFFER_SIZE, 1) });
             }
             this.bufferManager = bufferManager;
             this.timeout = timeout;
+        }
+
+        private void CreateTcpClient(Uri proxy)
+        {
+            if (proxy != null)
+            {
+                tcpClient = new TcpClient(proxy.DnsSafeHost, proxy.Port);
+            }
+            else
+            {
+                tcpClient = new TcpClient();
+            }
         }
 
         public SimpleHttpResponse Get(long start, long length)
@@ -96,7 +112,7 @@ Range: bytes={2}-{3}
                 if (tcpClient.Connected)
                 {
                     tcpClient.Close();
-                    tcpClient = new TcpClient();
+                    CreateTcpClient(proxy);
                     
                 }
                 baseUri = uri;
@@ -132,35 +148,39 @@ Range: bytes={2}-{3}
             var buffer = bufferManager.GetBuffer(BUFFER_SIZE);
             Dictionary<string, string> headers;
             int statusCode;
-            byte[] headerData;
             int bodyStarts = -1;
-            int bytesread = 0;
 
-            using (var ms = new MemoryStream())
+            int bytesread = stream.Read(buffer, 0, buffer.Length);
+
+            byte[] initialReadBytes = bufferManager.GetBuffer((uint) bytesread);
+            if (bytesread < 10)
             {
-                bytesread = stream.Read(buffer, 0, buffer.Length);
-                ms.Write(buffer, 0, bytesread);
-                //some calculations to determine how much data we are getting;
-                int bodyIndex = buffer.IndexOf(BODY_INDICATOR);
-                bodyStarts = bodyIndex + BODY_INDICATOR.Length;
-
-                headers = HttpParser.GetHttpHeaders(buffer, bodyIndex, out statusCode);
-                headerData = ms.ToArray();
+                throw new IOException("Invalid Header length");
             }
+
+            Buffer.BlockCopy(buffer, 0, initialReadBytes, 0, bytesread);
+
+            //some calculations to determine how much data we are getting;
+
+            int bodyIndex = initialReadBytes.IndexOf(BODY_INDICATOR);
+            bodyStarts = bodyIndex + BODY_INDICATOR.Length;
+
+            headers = HttpParser.GetHttpHeaders(initialReadBytes, bodyIndex, out statusCode);
+
 
             if (statusCode >= 200 && statusCode <= 300)
             {
 
                 long contentLength = long.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
 
-                var dest = bufferManager.GetBuffer((uint)contentLength);
+                var dest = bufferManager.GetBuffer((uint) contentLength);
                 using (var outputStream = new MemoryStream(dest))
                 {
-                    int destPlace = headerData.Length - bodyStarts;
+                    int destPlace = initialReadBytes.Length - bodyStarts;
                     long totalContent = contentLength + bodyStarts;
                     long left = totalContent - bytesread;
 
-                    outputStream.Write(headerData, bodyStarts, destPlace);
+                    outputStream.Write(initialReadBytes, bodyStarts, destPlace);
 
                     while (left > 0)
                     {
@@ -170,10 +190,12 @@ Range: bytes={2}-{3}
                         left -= bytesread;
                     }
                     bufferManager.FreeBuffer(buffer);
+                    bufferManager.FreeBuffer(initialReadBytes);
                     return new SimpleHttpResponse(statusCode, dest, headers);
                 }
             }
             bufferManager.FreeBuffer(buffer);
+
             return new SimpleHttpResponse(statusCode, null, headers);
         }
     }
