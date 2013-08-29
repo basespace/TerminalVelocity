@@ -436,27 +436,6 @@ namespace Illumina.TerminalVelocity.Tests
                  }
         }
 
-        [Test]
-        public void DownloadFile()
-        {
-            //8 threads
-            //MaxChunkSize = 1048576
-            //FileSize = 5242880
-
-            var uri = new Uri(@"https://cloud-internal-test.s3.amazonaws.com/fbfabff489004d75a0cba2260129473c/UnitTestFile_111115?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1377728665&Signature=VsNkseAfUfe0PxrfLr0i%2BDQ%2BX1c%3D");
-            var path = SafePath("sites_vcf.gz");
-            Action<string> logger = (message) => { };
-            var timer = new Stopwatch();
-            timer.Start();
-            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, maxThreads: 8);
-            Task task = parameters.DownloadAsync(logger: logger);
-            task.Wait(TimeSpan.FromMinutes(1));
-            timer.Stop();
-            Debug.WriteLine("Took {0} threads {1} ms", 8, timer.ElapsedMilliseconds);
-            //try to open the file
-            var f = new FileInfo(path);
-            Assert.True(f.Length == parameters.FileSize);
-        }
 
         public static string SafePath(string fileName)
         {
