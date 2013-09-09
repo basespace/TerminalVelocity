@@ -291,6 +291,24 @@ namespace Illumina.TerminalVelocity.Tests
               ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
           }
 
+
+          [Test()]
+          public void DownloadZeroByteFile()
+          {
+              var uri = new Uri(Constants.ZERO_BYTE_FILE);
+              string path = SafePath("sites_vcf.gz");
+              Action<string> logger = (message) => { };
+              var timer = new Stopwatch();
+              timer.Start();
+              ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,null, null);
+              Task task = parameters.DownloadAsync(logger: logger);
+              task.Wait(TimeSpan.FromMinutes(15));
+              timer.Stop();
+              Debug.WriteLine("Took {0} threads {1} ms", parameters.MaxThreads, timer.ElapsedMilliseconds);
+              //try to open the file
+              ValidateGZip(path, parameters.FileSize, Constants.ZERO_BYTE_CHECKSUM);
+          }
+
         internal static void ValidateGZip(string path, long fileSize, string checksum)
         {
             using (Stream fs = File.OpenRead(path))

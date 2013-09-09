@@ -40,6 +40,10 @@ namespace Illumina.TerminalVelocity
                 {
                     return response.ContentRangeLength.Value;
                 }
+                else if (response.StatusCode == 416)  //usually means zero byte file
+                {
+                    return response.ContentLength;
+                }
                 else
                 {
                     throw new Exception("Response was not successful, status code: " + response.StatusCode);

@@ -41,6 +41,15 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
         [Test]
+        public void GetContentLengthOfZeroByteFile()
+        {
+            //with wrong file size
+            var fileSize = new Uri(Constants.ZERO_BYTE_FILE).GetContentLength();
+            Assert.AreEqual(0, fileSize);
+
+        }
+
+        [Test]
         [ExpectedException(typeof(SocketException))]
         public void GetContentLengthThrowsOnInvalidUrl()
         {
