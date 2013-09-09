@@ -22,8 +22,9 @@ Accept-Charset: utf-8;q=0.7,*;q=0.3
 Range: bytes={2}-{3}
 
 ";
-        public static readonly byte[] BODY_INDICATOR = new byte[] {13, 10, 13, 10};
-        public const int BUFFER_SIZE = 1024*8;
+        internal const string INVALID_HEADER_LENGTH = "Invalid Header length";
+        public static readonly byte[] BODY_INDICATOR = new byte[] { 13, 10, 13, 10 };
+        public const int BUFFER_SIZE = 1024 * 8;
         public const int DEFAULT_TIMEOUT = 1000 * 200; //200 seconds
         private TcpClient tcpClient;
         private Uri baseUri;
@@ -35,7 +36,7 @@ Range: bytes={2}-{3}
         public SimpleHttpGetByRangeClient(Uri baseUri, BufferManager bufferManager = null, int timeout = DEFAULT_TIMEOUT, Uri proxy = null)
         {
             this.baseUri = baseUri;
-           
+
             this.proxy = proxy;
             CreateTcpClient(proxy);
 
@@ -66,14 +67,29 @@ Range: bytes={2}-{3}
 
         public SimpleHttpResponse Get(Uri uri, long start, long length)
         {
-            EnsureConnection(uri);
+            byte[] request;
+            try
+            {
+                EnsureConnection(uri);
+                request = Encoding.UTF8.GetBytes(BuildHttpRequest(uri, start, length));
+                stream.Write(request, 0, request.Length);
+                return ParseResult(stream, length);
+            }
+            catch (IOException exc)
+            {
+                if (exc.Message == INVALID_HEADER_LENGTH || exc.Message.Contains("The authentication or decryption has failed"))  //sometimes mono flakes out and throws this error
+                {
+                    EnsureConnection(uri, true);  //rebuild the connection
+                    request = Encoding.UTF8.GetBytes(BuildHttpRequest(uri, start, length));
+                    stream.Write(request, 0, request.Length);
+                    return ParseResult(stream, length);
+                }
+                else
+                {
+                    throw;
+                }
+            }
 
-            byte[] request = Encoding.UTF8.GetBytes(BuildHttpRequest(uri, start, length));
-            stream.Write(request, 0, request.Length);
-
-            SimpleHttpResponse response = ParseResult(stream, length);
-
-            return response;
         }
 
         public void Dispose()
@@ -101,27 +117,27 @@ Range: bytes={2}-{3}
             }
         }
 
-        protected void EnsureConnection(Uri uri)
+        protected void EnsureConnection(Uri uri, bool forceRebuild = false)
         {
-            if (uri.Host != baseUri.Host || (tcpClient.Connected && stream == null) )
+            if (forceRebuild || uri.Host != baseUri.Host || (tcpClient.Connected && stream == null))
             {
                 if (stream != null)
                 {
                     stream.Dispose();
                 }
-                if (tcpClient.Connected)
+                if (forceRebuild || tcpClient.Connected)
                 {
                     tcpClient.Close();
                     CreateTcpClient(proxy);
-                    
+
                 }
                 baseUri = uri;
             }
 
             if (!tcpClient.Connected)
             {
-                
-                tcpClient.ReceiveTimeout =timeout; 
+
+                tcpClient.ReceiveTimeout = timeout;
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
                 if (baseUri.Port == 443)
                 {
@@ -134,7 +150,7 @@ Range: bytes={2}-{3}
                     stream = tcpClient.GetStream();
                 }
             }
-           
+
         }
 
 
@@ -152,10 +168,10 @@ Range: bytes={2}-{3}
 
             int bytesread = stream.Read(buffer, 0, buffer.Length);
 
-            byte[] initialReadBytes = bufferManager.GetBuffer((uint) bytesread);
+            byte[] initialReadBytes = bufferManager.GetBuffer((uint)bytesread);
             if (bytesread < 10)
             {
-                throw new IOException("Invalid Header length");
+                throw new IOException(INVALID_HEADER_LENGTH);
             }
 
             Buffer.BlockCopy(buffer, 0, initialReadBytes, 0, bytesread);
@@ -173,7 +189,7 @@ Range: bytes={2}-{3}
 
                 long contentLength = long.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
 
-                var dest = bufferManager.GetBuffer((uint) contentLength);
+                var dest = bufferManager.GetBuffer((uint)contentLength);
                 using (var outputStream = new MemoryStream(dest))
                 {
                     int destPlace = initialReadBytes.Length - bodyStarts;
@@ -185,7 +201,7 @@ Range: bytes={2}-{3}
                     while (left > 0)
                     {
                         // Trace.WriteLine(string.Format("reading buffer {0}", (int)(left < buffer.Length ? left : buffer.Length)));
-                        bytesread = stream.Read(buffer, 0, (int) (left < buffer.Length ? left : buffer.Length));
+                        bytesread = stream.Read(buffer, 0, (int)(left < buffer.Length ? left : buffer.Length));
                         outputStream.Write(buffer, 0, bytesread);
                         left -= bytesread;
                     }
