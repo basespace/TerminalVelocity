@@ -119,7 +119,7 @@ Range: bytes={2}-{3}
 
         protected void EnsureConnection(Uri uri, bool forceRebuild = false)
         {
-            if (forceRebuild || uri.Host != baseUri.Host || (tcpClient.Connected && stream == null))
+            if (forceRebuild || uri.Host != baseUri.Host || uri.Port != baseUri.Port || (tcpClient.Connected && stream == null))
             {
                 if (stream != null)
                 {
@@ -139,7 +139,7 @@ Range: bytes={2}-{3}
 
                 tcpClient.ReceiveTimeout = timeout;
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
-                if (baseUri.Port == 443)
+                if (baseUri.Scheme.ToLower() == "https")
                 {
                     var sslStream = new SslStream(tcpClient.GetStream());
                     sslStream.AuthenticateAsClient(baseUri.Host);
@@ -156,7 +156,15 @@ Range: bytes={2}-{3}
 
         internal static string BuildHttpRequest(Uri uri, long start, long length)
         {
-            return string.Format(REQUEST_TEMPLATE, uri.AbsoluteUri, uri.Host, start, start + length - 1);
+            string hostHeader;
+            // see if they provided a port explicitly in the URI. If so, that must be set in the header
+            // default ports must NOT be set in the header
+            var port = uri.GetComponents(UriComponents.Port, UriFormat.Unescaped);
+            if (string.IsNullOrEmpty(port))
+                hostHeader = uri.Host;
+            else
+                hostHeader = uri.Host + ":" + uri.Port;
+            return string.Format(REQUEST_TEMPLATE, uri.PathAndQuery, hostHeader, start, start + length - 1);
         }
 
         public SimpleHttpResponse ParseResult(Stream stream, long length)

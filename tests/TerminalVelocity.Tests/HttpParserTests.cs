@@ -79,13 +79,23 @@ Server: TinyURL/1.6
         }
 
         [Test]
-        public void CanWeCreateRequestCorrectly()
+        public void CanWeCreateRequestCorrectlyDefaultPort()
         {
             Uri uri = new Uri(@"http://google.com");
             var request = SimpleHttpGetByRangeClient.BuildHttpRequest(uri, 0, 100);
-            var expected = string.Format(SampleHttpRequest, uri, uri.Host, 0, 99);
+            var expected = string.Format(SampleHttpRequest, uri.PathAndQuery, uri.Host, 0, 99);
             Assert.AreEqual(request, expected);
         }
+
+        [Test]
+        public void CanWeCreateRequestCorrectlyCustomPort()
+        {
+            Uri uri = new Uri(@"http://google.com:8080/foo/bar?baz=boo");
+            var request = SimpleHttpGetByRangeClient.BuildHttpRequest(uri, 0, 100);
+            var expected = string.Format(SampleHttpRequest, uri.PathAndQuery, "google.com:8080", 0, 99);
+            Assert.AreEqual(request, expected);
+        }
+
 
         [Test]
         public void CanWeParseHttpStatusCode()
