@@ -27,5 +27,15 @@ namespace Illumina.TerminalVelocity.Tests
 
         public const string ZERO_BYTE_CHECKSUM = "d41d8cd98f00b204e9800998ecf8427e";
 
+        public const string THIRTEEN_GIG_BAD_SAMPLE =
+            @"https://cloud-hoth-data-east.s3.amazonaws.com/6c9527dc17b74899813fa22f00a0b64e/Sample-1/RZ-UHR_S1_L001_R2_001.fastq.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1475855036&Signature=5KZsAZKkDh%2BqIieCJCnEYaHHgZc%3D";
+
+        public const long THIRTEEN_GIG_FILE_LENGTH = 14724364564;
+        public const string THIRTEEN_GIG_CHECKSUM = "0e4c2cfb3c758a35fe914bb3be2e54a1";
+
+        public const string FOURTEEN_GIG_FILE =
+            @"https://cloud-hoth-data-east.s3.amazonaws.com/a3f7efe8c8054c8ca775a22f00b7d2e1/Sample-8/mRNA-Brian_S8_L008_R2_001.fastq.gz?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1444261983&Signature=oPtorti3aB2wd0E6grtFkNK%2Bv0Y%3D";
+        public const long FOURTEEN_GIG_FILE_LENGTH = 14724364564;
+        public const string FOURTEEN_GIG_CHECKSUM = "0e4c2cfb3c758a35fe914bb3be2e54a1";
     }
 }
