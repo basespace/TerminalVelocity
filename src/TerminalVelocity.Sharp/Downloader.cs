@@ -51,7 +51,7 @@ namespace Illumina.TerminalVelocity
             try
             {
 
-                int writtenChunk = 0;
+                int writtenChunkZeroBased = 0;
                 var readStack = new ConcurrentStack<int>();
 
                 //add all of the chunks to the stack
@@ -89,22 +89,22 @@ namespace Illumina.TerminalVelocity
                 downloadTasks.ForEach(x => x.Start());
 
                 //start the write loop
-                while (writtenChunk < chunkCount && !ct.IsCancellationRequested)
+                while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
                 {
                   
                     ChunkedFilePart part;
                     if (writeQueue.TryDequeue(out part))
                     {
                         //retry?
-                        logger(string.Format("writing: {0}", writtenChunk));
+                        logger(string.Format("writing: {0}", writtenChunkZeroBased));
                         stream.Position = part.FileOffset;
                         stream.Write(part.Content,0, part.Length);
                         bufferManager.FreeBuffer(part.Content);
                         if (progress != null)
                         {
-                            progress.Report(new LargeFileDownloadProgressChangedEventArgs((int)Math.Round(100 * (writtenChunk / (float)chunkCount), 0), null));
+                            progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased,chunkCount), null));
                         }
-                        writtenChunk++;
+                        writtenChunkZeroBased++;
                     }
                     else
                     {
@@ -121,7 +121,6 @@ namespace Illumina.TerminalVelocity
                         }
                     }
                 }
-
             }
             catch (Exception e)
             {
@@ -145,6 +144,11 @@ namespace Illumina.TerminalVelocity
                     stream.Close();
                 }
             }
+        }
+
+        public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
+        {
+            return 1 + 99 * zeroBasedChunkNumber / (chunkCount-1);
         }
 
         internal static Task CreateDownloadTask(BufferManager bufferManager, ILargeFileDownloadParameters parameters,

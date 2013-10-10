@@ -32,7 +32,7 @@ namespace Illumina.TerminalVelocity.Tests
             var client = new SimpleHttpGetByRangeClient(uri);
             var response =client.Get(uri, 0, 100);
             timer.Stop();
-            Debug.WriteLine(string.Format("total {0}ms or {1}secs", timer.ElapsedMilliseconds, timer.ElapsedMilliseconds/1000));
+            Debug.WriteLine("total {0}ms or {1}secs", timer.ElapsedMilliseconds, timer.ElapsedMilliseconds/1000);
             Assert.NotNull(response);
             Assert.True(response.ContentLength == 100);
             Assert.True(response.ContentRangeLength == 1297662912);
@@ -75,6 +75,23 @@ namespace Illumina.TerminalVelocity.Tests
         public void ExpectedDownloadTimeCalculation(int chunkSize, int expected)
         {
             Assert.AreEqual( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
+        }
+
+        [Test]
+        public void TestProgressBarComputation()
+        {
+            int chunkCount = 10000;
+            for (int zeroBasedChunkNumber = 0; zeroBasedChunkNumber <= chunkCount-1; zeroBasedChunkNumber++)
+            {
+                var progressIndicatorValue = Downloader.ComputeProgressIndicator(zeroBasedChunkNumber, chunkCount);
+                Console.WriteLine("{0}:{1}", zeroBasedChunkNumber, progressIndicatorValue);
+
+                Assert.IsTrue(
+                    (zeroBasedChunkNumber == 0 && progressIndicatorValue == 1)
+                    || ((zeroBasedChunkNumber + 1) != chunkCount && progressIndicatorValue != 100) 
+                    || ((zeroBasedChunkNumber + 1) == chunkCount && progressIndicatorValue == 100)
+                    );
+            }
         }
 
         [Test]
