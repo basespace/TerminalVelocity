@@ -153,7 +153,9 @@ namespace Illumina.TerminalVelocity
                                         continue;
                                     }
 
-                                    if (!(downloadWorkers[i].Status == TaskStatus.Running || downloadWorkers[i].Status == TaskStatus.WaitingToRun))
+                                    if (!(downloadWorkers[i].Status == TaskStatus.Running 
+                                        || downloadWorkers[i].Status == TaskStatus.WaitingToRun 
+                                        || downloadWorkers[i].Status == TaskStatus.RanToCompletion))
                                     {
                                         downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
                                         shouldISlow, expectedChunkDownloadTime, logger, ct);
