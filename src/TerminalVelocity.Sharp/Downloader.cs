@@ -72,20 +72,17 @@ namespace Illumina.TerminalVelocity
                 var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
 
                 // ReSharper disable AccessToModifiedClosure
-                Func<int, bool> shouldISlow = (int c) => writeQueue.Count > 30;
+                Func<int, bool> downloadThrottle = (int c) => writeQueue.Count > 30;
                 // ReSharper restore AccessToModifiedClosure
                 var addEvent = new AutoResetEvent(false);
                 if (bufferManager == null)
                 {
 
-                    bufferManager =
-                        new BufferManager(new[]
-                                              {
-                                                  new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE,
-                                                                         (uint) numberOfThreads),
-                                                  new BufferQueueSetting((uint) parameters.MaxChunkSize,
-                                                                         (uint) numberOfThreads)
-                                              });
+                    bufferManager = new BufferManager(new[]
+                    {
+                        new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint) numberOfThreads),
+                        new BufferQueueSetting((uint) parameters.MaxChunkSize, (uint) numberOfThreads)
+                    });
                 }
                 downloadWorkers = new List<Downloader>(numberOfThreads);
                 int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
@@ -94,7 +91,7 @@ namespace Illumina.TerminalVelocity
                 for (int i = 0; i < numberOfThreads; i++)
                 {
                     downloadWorkers.Add(new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                        shouldISlow, expectedChunkDownloadTime, logger, ct));
+                                        downloadThrottle, expectedChunkDownloadTime, logger, ct));
                 }
                 //start all the download threads
                 downloadWorkers.ForEach(x => x.Start());
@@ -141,14 +138,14 @@ namespace Illumina.TerminalVelocity
                             addEvent.WaitOne(100);
                             addEvent.Reset();
 
-                            if (activeWorkers.Count() != numberOfThreads)
+                            if (activeWorkers.Count() < numberOfThreads)
                             {
                                 for (int i=0; i< numberOfThreads; i++)
                                 {
                                     if (downloadWorkers[i] == null)
                                     {
                                         downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                        shouldISlow, expectedChunkDownloadTime, logger, ct);
+                                        downloadThrottle, expectedChunkDownloadTime, logger, ct);
                                         downloadWorkers[i].Start();
                                         continue;
                                     }
@@ -158,9 +155,10 @@ namespace Illumina.TerminalVelocity
                                         || downloadWorkers[i].Status == TaskStatus.RanToCompletion))
                                     {
                                         downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                        shouldISlow, expectedChunkDownloadTime, logger, ct);
+                                        downloadThrottle, expectedChunkDownloadTime, logger, ct);
                                         downloadWorkers[i].Start();
                                     }
+
                                 }
                             }
                         }
@@ -230,7 +228,7 @@ namespace Illumina.TerminalVelocity
                             ConcurrentQueue<ChunkedFilePart> writeQueue,
                             AutoResetEvent reset, 
                             ConcurrentStack<int> readStack,
-                            Func<int, bool> shouldSlowDown, 
+                            Func<int, bool> downloadThrottle, 
                             int expectedChunkTimeInSeconds, 
                             Action<string> logger = null,
                             CancellationToken? cancellation = null,
@@ -293,7 +291,7 @@ namespace Illumina.TerminalVelocity
                                                  {
                                                      currentChunk = -1;
                                                  }
-                                                 while (shouldSlowDown(currentChunk))
+                                                 while (downloadThrottle(currentChunk))
                                                  {
                                                      logger(string.Format("throttling for chunk: {0}", currentChunk));
                                                      if (!cancellation.Value.IsCancellationRequested)
