@@ -99,7 +99,6 @@ namespace Illumina.TerminalVelocity
                 //start the write loop
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
                 {
-                  
                     ChunkedFilePart part;
                     if (writeQueue.TryDequeue(out part))
                     {
@@ -124,7 +123,12 @@ namespace Illumina.TerminalVelocity
                         {
                             foreach (var worker in timedOutWorkers)
                             {
-                                worker.DownloadWorkerTask.Wait(1);
+                                try
+                                {
+                                    worker.DownloadWorkerTask.Wait(1); // this has a minute chance of throwing
+                                }
+                                catch(Exception ex)
+                                {}
                             }
                         }
 

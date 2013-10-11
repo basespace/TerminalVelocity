@@ -251,7 +251,7 @@ namespace Illumina.TerminalVelocity.Tests
             var timer = new Stopwatch();
               timer.Start();
             ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 29996532, maxThreads: threadCount);
-           Task task = parameters.DownloadAsync(logger: logger);
+            Task task = parameters.DownloadAsync(logger: logger);
             task.Wait(TimeSpan.FromMinutes(5));
             timer.Stop();
             Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
