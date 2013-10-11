@@ -109,11 +109,11 @@ namespace Illumina.TerminalVelocity
                         //retry?
                         logger(string.Format("writing: {0}", writtenChunkZeroBased));
                         stream.Position = part.FileOffset;
-                        stream.Write(part.Content,0, part.Length);
+                        stream.Write(part.Content, 0, part.Length);
                         bufferManager.FreeBuffer(part.Content);
                         if (progress != null)
                         {
-                            progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased,chunkCount), null));
+                            progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount), null));
                         }
                         writtenChunkZeroBased++;
                     }
