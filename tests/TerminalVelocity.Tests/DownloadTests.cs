@@ -71,7 +71,7 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
         
-        [TestCase(16 * 1024, 12), TestCase(0,12), TestCase(2, 12), TestCase(1024, 12), TestCase(1024*1024, 80), TestCase(5 * (1024*1024), 400)]
+        [TestCase(16 * 1024, 10), TestCase(0,10), TestCase(2, 10), TestCase(1024, 10), TestCase(1024*1024, 80), TestCase(5 * (1024*1024), 400)]
         public void ExpectedDownloadTimeCalculation(int chunkSize, int expected)
         {
             Assert.AreEqual( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));

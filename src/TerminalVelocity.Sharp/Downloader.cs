@@ -272,9 +272,8 @@ namespace Illumina.TerminalVelocity
             //1024bytes in a KB
             //1048576 bytes in a MB
 
-            int raw = Math.Max(chunkSizeInBytes / 16384, 10);  //lowest is 10 seconds
-            return  raw + ((int) Math.Round(raw * .25, 0));  //add 25% overhead, minimum 10 sec
-
+            int raw = chunkSizeInBytes / 16384; 
+            return (int) Math.Max(raw * 1.25, 10);  //add 25% overhead, minimum 10 sec
         }
 
 
