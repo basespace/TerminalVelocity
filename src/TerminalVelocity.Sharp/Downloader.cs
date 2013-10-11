@@ -119,12 +119,46 @@ namespace Illumina.TerminalVelocity
                     }
                     else
                     {
+                        // kill hanged workers
+                        var timedOutWorkers = downloadWorkers
+                            .Where(w => w.Status == TaskStatus.Running)
+                            .Where(w => w.HeartBeat.AddSeconds(expectedChunkDownloadTime) < DateTime.Now);
+                        if (timedOutWorkers.Any())
+                        {
+                            foreach (var worker in timedOutWorkers)
+                            {
+                                worker.DownloadWorkerTask.Wait(1);
+                            }
+                        }
+
+                        var activeWorkers = downloadWorkers.Where(x => x != null && (x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun));
+                        // respawn the missing workers if some had too many retries or were killed
+
                         //are any of the treads alive?
-                        if (downloadTasks.Any(x => x != null && (x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun)))
+                        if (activeWorkers.Any())
                         {
                             //wait for something that was added
                             addEvent.WaitOne(100);
                             addEvent.Reset();
+
+                            if (activeWorkers.Count() != numberOfThreads)
+                            {
+                                for (int i=0; i< numberOfThreads; i++)
+                                {
+                                    if (downloadWorkers[i] == null)
+                                    {
+                                        downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
+                                        shouldISlow, expectedChunkDownloadTime, logger, ct);
+                                        continue;
+                                    }
+
+                                    if (!(downloadWorkers[i].Status == TaskStatus.Running || downloadWorkers[i].Status == TaskStatus.WaitingToRun))
+                                    {
+                                        downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
+                                        shouldISlow, expectedChunkDownloadTime, logger, ct);
+                                    }
+                                }
+                            }
                         }
                         else
                         {
