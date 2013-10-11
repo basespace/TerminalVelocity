@@ -148,7 +148,7 @@ namespace Illumina.TerminalVelocity
 
         public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
         {
-            return 1 + 99 * zeroBasedChunkNumber / (chunkCount-1);
+            return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
         }
 
         internal static Task CreateDownloadTask(BufferManager bufferManager, ILargeFileDownloadParameters parameters,
@@ -169,13 +169,12 @@ namespace Illumina.TerminalVelocity
                                      ISimpleHttpGetByRangeClient client = clientFactory(parameters);
                                      int currentChunk;
                                      readStack.TryPop(out currentChunk);
-                                     int tries = 0;
+                                     int delayThrottle = 0;
 
                                      try
                                      {
 
-                                         while (currentChunk >= 0 && tries < 15 &&
-                                                !cancellation.Value.IsCancellationRequested) //-1 when we are done
+                                         while (currentChunk >= 0 && !cancellation.Value.IsCancellationRequested) //-1 when we are done
                                          {
                                              logger(string.Format("downloading: {0}", currentChunk));
                                              SimpleHttpResponse response = null;
@@ -205,7 +204,8 @@ namespace Illumina.TerminalVelocity
                                                  part.Content = response.Content;
                                                  writeQueue.Enqueue(part);
 
-                                                 tries = 0;
+                                                 // reset the throttle when the part is finally successful
+                                                 delayThrottle = 0;
                                                  logger(string.Format("downloaded: {0}", currentChunk));
                                                  reset.Set();
                                                  if (!readStack.TryPop(out currentChunk))
@@ -223,12 +223,12 @@ namespace Illumina.TerminalVelocity
                                              }
                                              else if (response == null || response.IsStatusCodeRetryable)
                                              {
-                                                 int sleepSecs = (int)Math.Pow(4.95, tries);
+                                                 int sleepSecs = Math.Min((int)Math.Pow(4.95, delayThrottle), 600);
                                                  logger(string.Format("sleeping: {0}, {1}s", currentChunk, sleepSecs));
                                                  if (!cancellation.Value.IsCancellationRequested)
                                                  {
                                                      Thread.Sleep(sleepSecs * 1000); // 4s, 25s, 120s, 600s
-                                                     tries++;
+                                                     delayThrottle++;
                                                  }
                                              }
                                              else
