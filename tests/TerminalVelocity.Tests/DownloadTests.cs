@@ -117,7 +117,7 @@ namespace Illumina.TerminalVelocity.Tests
                                                 return true;
                                             };
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = Downloader.CreateDownloadTask(bufferManager, parameters,writeQueue ,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
+            var task = new Downloader(bufferManager, parameters,writeQueue ,e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object );
             task.Start();
             task.Wait(2000);
             try
@@ -160,7 +160,7 @@ namespace Illumina.TerminalVelocity.Tests
             {
                 var bufferManager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize )  });
                 var ct = new CancellationTokenSource();
-                var task = Downloader.CreateDownloadTask(bufferManager, parameters, writeQueue, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
+                var task = new Downloader(bufferManager, parameters, writeQueue, e, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize),
                                                          clientFactory: (x) => mockClient.Object, cancellation: ct.Token);
                 task.Start();
                 task.Wait(5000);
@@ -206,7 +206,7 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = Downloader.CreateDownloadTask(bufferManager, parameters, writeQueue, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = new Downloader(bufferManager, parameters, writeQueue, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();

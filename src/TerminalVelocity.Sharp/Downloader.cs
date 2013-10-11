@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Illumina.TerminalVelocity
 {
-    public static class Downloader
+    public static class DownloaderExtensions
     {
         public static Task DownloadAsync(this ILargeFileDownloadParameters parameters,
                                          CancellationToken? cancellationToken = null,
@@ -16,14 +16,23 @@ namespace Illumina.TerminalVelocity
                                          Action<string> logger = null, BufferManager bufferManager = null)
         {
             CancellationToken ct = (cancellationToken != null) ? cancellationToken.Value : CancellationToken.None;
-            
-            Task task = Task.Factory.StartNew(() => StartDownloading(ct, parameters, progress, logger), ct);
+
+            Task task = Task.Factory.StartNew(() => Downloader.StartDownloading(ct, parameters, progress, logger), ct);
 
             return task;
         }
+    }
 
-        internal static void StartDownloading(CancellationToken ct, ILargeFileDownloadParameters parameters, IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
-                                         Action<string> logger = null, BufferManager bufferManager = null)
+    public class Downloader
+    {
+        public Task DownloadWorkerTask { get; set; }
+        public DateTime HeartBeat { get; set; }
+
+        internal static void StartDownloading(CancellationToken ct, 
+            ILargeFileDownloadParameters parameters, 
+            IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
+            Action<string> logger = null, 
+            BufferManager bufferManager = null)
         {
             //create the file
             Stream stream = parameters.GetOutputStream();
@@ -47,7 +56,7 @@ namespace Illumina.TerminalVelocity
             int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
             logger = logger ?? ((s) => { });
 
-            List<Task> downloadTasks = null;
+            List<Downloader> downloadWorkers = null;
             try
             {
 
@@ -78,15 +87,17 @@ namespace Illumina.TerminalVelocity
                                                                          (uint) numberOfThreads)
                                               });
                 }
-                downloadTasks = new List<Task>(numberOfThreads);
+                downloadWorkers = new List<Downloader>(numberOfThreads);
                 int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
+
+
                 for (int i = 0; i < numberOfThreads; i++)
                 {
-                    downloadTasks.Add(CreateDownloadTask(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                                         shouldISlow, expectedChunkDownloadTime, logger, ct));
+                    downloadWorkers.Add(new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
+                                        shouldISlow, expectedChunkDownloadTime, logger, ct));
                 }
                 //start all the download threads
-                downloadTasks.ForEach(x => x.Start());
+                downloadWorkers.ForEach(x => x.Start());
 
                 //start the write loop
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
@@ -130,9 +141,9 @@ namespace Illumina.TerminalVelocity
             finally
             {
                 //kill all the tasks if exist
-                if (downloadTasks != null)
+                if (downloadWorkers != null)
                 {
-                    downloadTasks.ForEach(x =>
+                    downloadWorkers.ForEach(x =>
                     {
                         if (x == null) return;
 
@@ -146,23 +157,52 @@ namespace Illumina.TerminalVelocity
             }
         }
 
+        public void Start()
+        {
+            DownloadWorkerTask.Start();
+        }
+        public void Wait(int time)
+        {
+            DownloadWorkerTask.Wait(time);
+        }
+        public void Wait(TimeSpan time)
+        {
+            DownloadWorkerTask.Wait(time);
+        }
+        public void Dispose()
+        {
+            DownloadWorkerTask.Dispose();
+        }
+        public TaskStatus Status
+        {
+            get
+            {
+                return DownloadWorkerTask.Status;
+            }
+        }
+
+
         public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
         {
             return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
         }
 
-        internal static Task CreateDownloadTask(BufferManager bufferManager, ILargeFileDownloadParameters parameters,
-                                                ConcurrentQueue<ChunkedFilePart> writeQueue,
-                                                AutoResetEvent reset, ConcurrentStack<int> readStack ,
-                                                Func<int, bool> shouldSlowDown, int expectedChunkTimeInSeconds, Action<string> logger = null,
-                                                CancellationToken? cancellation = null,
-                                                Func<ILargeFileDownloadParameters, ISimpleHttpGetByRangeClient>
-                                                    clientFactory = null)
+        internal Downloader(BufferManager bufferManager, 
+                            ILargeFileDownloadParameters parameters,
+                            ConcurrentQueue<ChunkedFilePart> writeQueue,
+                            AutoResetEvent reset, 
+                            ConcurrentStack<int> readStack,
+                            Func<int, bool> shouldSlowDown, 
+                            int expectedChunkTimeInSeconds, 
+                            Action<string> logger = null,
+                            CancellationToken? cancellation = null,
+                            Func<ILargeFileDownloadParameters, 
+                            ISimpleHttpGetByRangeClient> clientFactory = null)
         {
             cancellation = (cancellation != null) ? cancellation.Value : CancellationToken.None;
-            var t = new Task(() =>
+
+            DownloadWorkerTask = new Task((() =>
                                  {
-                                     
                                      clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri, bufferManager, expectedChunkTimeInSeconds * 1000 ));
                                      logger = logger ?? ((s) => { });
 
@@ -208,6 +248,9 @@ namespace Illumina.TerminalVelocity
                                                  delayThrottle = 0;
                                                  logger(string.Format("downloaded: {0}", currentChunk));
                                                  reset.Set();
+
+                                                 HeartBeat = DateTime.Now;
+
                                                  if (!readStack.TryPop(out currentChunk))
                                                  {
                                                      currentChunk = -1;
@@ -250,8 +293,8 @@ namespace Illumina.TerminalVelocity
                                          }
                                      }
                                      logger(String.Format("Thread {0} done" ,Thread.CurrentThread.ManagedThreadId));
-                                 }, cancellation.Value);
-            return t;
+                                 }), cancellation.Value);
+
         }
 
         internal static void ExecuteAndSquash( Action a)
