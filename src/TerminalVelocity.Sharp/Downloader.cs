@@ -149,6 +149,7 @@ namespace Illumina.TerminalVelocity
                                     {
                                         downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
                                         shouldISlow, expectedChunkDownloadTime, logger, ct);
+                                        downloadWorkers[i].Start();
                                         continue;
                                     }
 
@@ -156,6 +157,7 @@ namespace Illumina.TerminalVelocity
                                     {
                                         downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
                                         shouldISlow, expectedChunkDownloadTime, logger, ct);
+                                        downloadWorkers[i].Start();
                                     }
                                 }
                             }
