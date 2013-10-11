@@ -283,10 +283,19 @@ namespace Illumina.TerminalVelocity
             return currentChunk*(long)maxChunkSize;
         }
 
-        internal static int GetChunkCount(long fileSize, int chunkSize)
+        internal static int GetChunkCount(long fileSize, long chunkSize)
         {
-            if (chunkSize == 0 || fileSize == 0) return 0;
-            return (int) (fileSize/chunkSize + (fileSize%chunkSize > 0 ? 1 : 0));
+            if (chunkSize == 0)
+                return 0;
+
+            // from Euclid: length = chunkSize * chunkCount + remainder
+            // where remainder = length % chunkSize
+            // the trick is that from the remainder formula, we need length 
+            // to be zero-based and chunkSize to be one-based
+            // also the remainder formula returns a zero-based number.
+            // from here you can infer that chunkCount must be zero-based.
+            int chunkCount = (int) (((fileSize - 1) - (fileSize - 1) % chunkSize) / chunkSize);
+            return 1 + chunkCount;
         }
 
         internal static int GetChunkSizeForCurrentChunk(long fileSize, int maxChunkSize, int zeroBasedChunkNumber)
