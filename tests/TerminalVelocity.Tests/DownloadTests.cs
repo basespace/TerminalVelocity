@@ -250,7 +250,7 @@ namespace Illumina.TerminalVelocity.Tests
             Action<string> logger = ( message) => Trace.WriteLine(message);
             var timer = new Stopwatch();
               timer.Start();
-            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 29996532, maxThreads: threadCount);
+            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 29996532, null, maxThreads: threadCount);
             Task task = parameters.DownloadAsync(logger: logger);
             task.Wait(TimeSpan.FromMinutes(5));
             timer.Stop();
@@ -269,7 +269,7 @@ namespace Illumina.TerminalVelocity.Tests
                                           var timer = new Stopwatch();
                                           timer.Start();
                                           ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(
-                                              uri, path, 29996532, maxThreads: threadCount);
+                                              uri, path, 29996532,null, maxThreads: threadCount);
                                           Task task = parameters.DownloadAsync(logger: logger);
                                           task.Wait(TimeSpan.FromMinutes(5));
                                           timer.Stop();
@@ -299,7 +299,7 @@ namespace Illumina.TerminalVelocity.Tests
               var timer = new Stopwatch();
               timer.Start();
               var manager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount),new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE)  });
-              ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,  1297662912,  maxThreads: threadCount);
+              ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,  1297662912,null,  maxThreads: threadCount);
               Task task = parameters.DownloadAsync(logger: logger, bufferManager:manager);
               task.Wait(TimeSpan.FromMinutes(15));
               timer.Stop();
@@ -454,7 +454,7 @@ namespace Illumina.TerminalVelocity.Tests
             Action<string> logger = (message) => { };
             var timer = new Stopwatch();
             timer.Start();
-            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, maxThreads: 8);
+            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, null, maxThreads: 8);
             Task task = parameters.DownloadAsync(logger: logger);
             task.Wait(TimeSpan.FromMinutes(1));
             timer.Stop();
