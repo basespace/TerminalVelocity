@@ -108,3 +108,4 @@ Backup*/
 UpgradeLog*.XML
 
 *.received.txt
+TerminalVelocity.userprefs
