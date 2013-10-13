@@ -96,6 +96,7 @@ namespace Illumina.TerminalVelocity
                 //start all the download threads
                 downloadWorkers.ForEach(x => x.Start());
 
+                int kc = 0;
                 //start the write loop
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
                 {
@@ -126,6 +127,7 @@ namespace Illumina.TerminalVelocity
                                 try
                                 {
                                     worker.DownloadWorkerTask.Wait(1); // this has a minute chance of throwing
+                                    Console.WriteLine("killing thread as it timed out {0}", kc++);
                                 }
                                 catch(Exception ex)
                                 {}
@@ -239,6 +241,7 @@ namespace Illumina.TerminalVelocity
                             Func<ILargeFileDownloadParameters, 
                             ISimpleHttpGetByRangeClient> clientFactory = null)
         {
+            HeartBeat = DateTime.Now;
             cancellation = (cancellation != null) ? cancellation.Value : CancellationToken.None;
 
             DownloadWorkerTask = new Task((() =>

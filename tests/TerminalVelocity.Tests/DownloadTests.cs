@@ -301,7 +301,7 @@ namespace Illumina.TerminalVelocity.Tests
               var manager = new BufferManager(new []{new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount),new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE)  });
               ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path,  1297662912,null,  maxThreads: threadCount);
               Task task = parameters.DownloadAsync(logger: logger, bufferManager:manager);
-              task.Wait(TimeSpan.FromMinutes(15));
+              task.Wait(TimeSpan.FromMinutes(25));
               timer.Stop();
               Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
               //try to open the file
