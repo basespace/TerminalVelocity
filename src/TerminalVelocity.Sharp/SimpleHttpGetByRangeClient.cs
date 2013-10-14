@@ -23,8 +23,9 @@ Range: bytes={2}-{3}
 
 ";
         internal const string INVALID_HEADER_LENGTH = "Invalid Header length";
+        internal const string STREAM_CLOSED_ERROR = "The stream is not returning any more data";
         public static readonly byte[] BODY_INDICATOR = new byte[] { 13, 10, 13, 10 };
-        public const int BUFFER_SIZE = 1024 * 8;
+        public const int BUFFER_SIZE = 9000;
         public const int DEFAULT_TIMEOUT = 1000 * 200; //200 seconds
         private TcpClient tcpClient;
         private Uri baseUri;
@@ -123,13 +124,13 @@ Range: bytes={2}-{3}
             {
                 if (stream != null)
                 {
+                    stream.Close();
                     stream.Dispose();
                 }
                 if (forceRebuild || tcpClient.Connected)
                 {
                     tcpClient.Close();
                     CreateTcpClient(proxy);
-
                 }
                 baseUri = uri;
             }
@@ -149,6 +150,7 @@ Range: bytes={2}-{3}
                 {
                     stream = tcpClient.GetStream();
                 }
+
             }
 
         }
@@ -167,60 +169,67 @@ Range: bytes={2}-{3}
             return string.Format(REQUEST_TEMPLATE, uri.PathAndQuery, hostHeader, start, start + length - 1);
         }
 
+
         public SimpleHttpResponse ParseResult(Stream stream, long length)
         {
             var buffer = bufferManager.GetBuffer(BUFFER_SIZE);
-            Dictionary<string, string> headers;
-            int statusCode;
-            int bodyStarts = -1;
-
             int bytesread = stream.Read(buffer, 0, buffer.Length);
 
             byte[] initialReadBytes = bufferManager.GetBuffer((uint)bytesread);
-            if (bytesread < 10)
+
+            SimpleHttpResponse response;
+
+            try
             {
-                throw new IOException(INVALID_HEADER_LENGTH);
-            }
+                if (bytesread < 10)
+                    throw new IOException(INVALID_HEADER_LENGTH);
 
-            Buffer.BlockCopy(buffer, 0, initialReadBytes, 0, bytesread);
+                Buffer.BlockCopy(buffer, 0, initialReadBytes, 0, bytesread);
 
-            //some calculations to determine how much data we are getting;
+                //some calculations to determine how much data we are getting;
 
-            int bodyIndex = initialReadBytes.IndexOf(BODY_INDICATOR);
-            bodyStarts = bodyIndex + BODY_INDICATOR.Length;
+                int bodyIndex = initialReadBytes.IndexOf(BODY_INDICATOR);
+                int bodyStarts = bodyIndex + BODY_INDICATOR.Length;
 
-            headers = HttpParser.GetHttpHeaders(initialReadBytes, bodyIndex, out statusCode);
+                int statusCode;
+                var headers = HttpParser.GetHttpHeaders(initialReadBytes, bodyIndex, out statusCode);
 
-
-            if (statusCode >= 200 && statusCode <= 300)
-            {
-
-                long contentLength = long.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
-
-                var dest = bufferManager.GetBuffer((uint)contentLength);
-                using (var outputStream = new MemoryStream(dest))
+                if (statusCode >= 200 && statusCode <= 300)
                 {
-                    int destPlace = initialReadBytes.Length - bodyStarts;
-                    long totalContent = contentLength + bodyStarts;
-                    long left = totalContent - bytesread;
+                    long contentLength = long.Parse(headers[HttpParser.HttpHeaders.ContentLength]);
 
-                    outputStream.Write(initialReadBytes, bodyStarts, destPlace);
-
-                    while (left > 0)
+                    var dest = bufferManager.GetBuffer((uint)contentLength);
+                    using (var outputStream = new MemoryStream(dest))
                     {
-                        // Trace.WriteLine(string.Format("reading buffer {0}", (int)(left < buffer.Length ? left : buffer.Length)));
-                        bytesread = stream.Read(buffer, 0, (int)(left < buffer.Length ? left : buffer.Length));
-                        outputStream.Write(buffer, 0, bytesread);
-                        left -= bytesread;
-                    }
-                    bufferManager.FreeBuffer(buffer);
-                    bufferManager.FreeBuffer(initialReadBytes);
-                    return new SimpleHttpResponse(statusCode, dest, headers);
-                }
-            }
-            bufferManager.FreeBuffer(buffer);
+                        int destPlace = initialReadBytes.Length - bodyStarts;
+                        long totalContent = contentLength + bodyStarts;
+                        long left = totalContent - bytesread;
 
-            return new SimpleHttpResponse(statusCode, null, headers);
+                        outputStream.Write(initialReadBytes, bodyStarts, destPlace);
+
+                        while (left > 0)
+                        {
+                            if (bytesread == 0)
+                                throw new IOException(STREAM_CLOSED_ERROR);
+
+                            // Trace.WriteLine(string.Format("reading buffer {0}", (int)(left < buffer.Length ? left : buffer.Length)));
+                            bytesread = stream.Read(buffer, 0, (int)(left < buffer.Length ? left : buffer.Length));
+                        
+                            outputStream.Write(buffer, 0, bytesread);
+                            left -= bytesread;
+                        }
+                        response = new SimpleHttpResponse(statusCode, dest, headers);
+                    }
+                }
+                else
+                    response = new SimpleHttpResponse(statusCode, null, headers);
+            }
+            finally
+            {
+                bufferManager.FreeBuffer(buffer);
+                bufferManager.FreeBuffer(initialReadBytes);
+            }
+            return response;
         }
     }
 }

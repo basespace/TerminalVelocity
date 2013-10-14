@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using ICSharpCode.SharpZipLib.GZip;
 using Moq;
 using NUnit.Framework;
+using ThreadState = System.Threading.ThreadState;
 
 namespace Illumina.TerminalVelocity.Tests
 {
@@ -259,6 +260,75 @@ namespace Illumina.TerminalVelocity.Tests
             ValidateGZip(path, parameters.FileSize, Constants.TWENTY_CHECKSUM);
         }
 
+
+
+          [TestCase(4)]
+          public void SimulateThreadHangAndRecovery(int threadCount)
+          {
+
+              var uri = new Uri(Constants.TWENTY_MEG_FILE);
+              var path = SafePath("sites_vcf.gz");
+              Action<string> logger = (message) => Trace.WriteLine(message);
+              var timer = new Stopwatch();
+              timer.Start();
+              ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, Constants.TWENTY_MEG_FILE_LENGTH, null, threadCount);
+              Task task = parameters.DownloadAsync(logger: logger);
+
+              List<Downloader> dlrList = Downloader.ParentThreadToDownloaders.Values.FirstOrDefault();
+
+              while (dlrList == null || dlrList.Count < threadCount)
+              {
+                  dlrList = Downloader.ParentThreadToDownloaders.Values.FirstOrDefault();
+                  Thread.Sleep(200);
+              }
+              var rnd = new Random((int)DateTime.Now.Ticks);
+              var threadToKill = rnd.Next(dlrList.Count());
+
+              dlrList[threadToKill].SimulateTimedOut = true;
+              var sw = new Stopwatch();
+              sw.Start();
+              var gotKilled = false;
+
+              // wait for the thread to be killed within a few seconds
+              while (sw.ElapsedMilliseconds < 10000)
+              {
+                  if (dlrList[threadToKill].DownloadWorkerThread.ThreadState == ThreadState.Aborted)
+                  {
+                      gotKilled = true;
+                      break;
+                  }
+              }
+
+              Assert.True(gotKilled);
+
+              // make sure the thread gets respawned within a few seconds
+              sw.Restart();
+              var gotReplaced = false;
+              while (sw.ElapsedMilliseconds < 10000)
+              {
+                  var thread = dlrList[threadToKill].DownloadWorkerThread;
+
+                  if (thread == null)
+                      continue;
+
+                  if (thread.ThreadState == ThreadState.Running)
+                  {
+                      gotReplaced = true;
+                      break;
+                  }
+              }
+
+              Assert.IsTrue(gotReplaced);
+
+              // make sure we have a successful download
+              task.Wait(TimeSpan.FromMinutes(5));
+              timer.Stop();
+              Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
+              //try to open the file
+              ValidateGZip(path, parameters.FileSize, Constants.TWENTY_CHECKSUM);
+
+          }
+
           [TestCase(2, 2), TestCase(2, 5)]
           public void MultipleParallelChunkedDownload(int threadCount, int parallelFactor)
           {
@@ -349,10 +419,11 @@ namespace Illumina.TerminalVelocity.Tests
             using (Stream fs = File.OpenRead(path))
             {
                 Assert.True(fs.Length == fileSize);
-               string actualChecksum = Md5SumByProcess(path);
+                string actualChecksum = Md5SumByProcess(path);
                 Assert.AreEqual(checksum, actualChecksum);
-
+                Debug.WriteLine("file checksum succesfully validated");
             }
+
         }
 
         [Test]

@@ -25,8 +25,14 @@ namespace Illumina.TerminalVelocity
 
     public class Downloader
     {
-        public Task DownloadWorkerTask { get; set; }
+        public Thread DownloadWorkerThread { get; set; }
         public DateTime HeartBeat { get; set; }
+
+        // needed for Unit Testing
+        internal bool SimulateTimedOut { get; set; }
+        // needed for Unit Testing
+        internal static ConcurrentDictionary<int, List<Downloader>> ParentThreadToDownloaders= new ConcurrentDictionary<int, List<Downloader>>();
+
 
         internal static void StartDownloading(CancellationToken ct, 
             ILargeFileDownloadParameters parameters, 
@@ -56,7 +62,11 @@ namespace Illumina.TerminalVelocity
             int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
             logger = logger ?? ((s) => { });
 
-            List<Downloader> downloadWorkers = null;
+            int currentThread = Thread.CurrentThread.ManagedThreadId;
+
+            var downloadWorkers = new List<Downloader>(numberOfThreads);
+
+            ParentThreadToDownloaders.AddOrUpdate(currentThread, (t) => downloadWorkers, (t,u) => downloadWorkers);
             try
             {
 
@@ -65,9 +75,6 @@ namespace Illumina.TerminalVelocity
 
                 //add all of the chunks to the stack
                 readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
-
-               
-
 
                 var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
 
@@ -84,7 +91,7 @@ namespace Illumina.TerminalVelocity
                         new BufferQueueSetting((uint) parameters.MaxChunkSize, (uint) numberOfThreads)
                     });
                 }
-                downloadWorkers = new List<Downloader>(numberOfThreads);
+                
                 int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
 
 
@@ -118,23 +125,34 @@ namespace Illumina.TerminalVelocity
                     {
                         // kill hanged workers
                         var timedOutWorkers = downloadWorkers
-                            .Where(w => w.Status == TaskStatus.Running)
-                            .Where(w => w.HeartBeat.AddSeconds(expectedChunkDownloadTime) < DateTime.Now);
+                            .Where(w => w.Status == ThreadState.Running || w.Status == ThreadState.WaitSleepJoin)
+                            .Where((w) =>
+                               {
+                                   if (w.SimulateTimedOut)
+                                       return true;
+                                   return w.HeartBeat.AddSeconds(expectedChunkDownloadTime) < DateTime.Now;
+                               })
+                       .ToList();
+
                         if (timedOutWorkers.Any())
                         {
                             foreach (var worker in timedOutWorkers)
                             {
                                 try
                                 {
-                                    worker.DownloadWorkerTask.Wait(1); // this has a minute chance of throwing
-                                    Console.WriteLine("killing thread as it timed out {0}", kc++);
+                                    worker.DownloadWorkerThread.Abort(); // this has a minute chance of throwing
+                                    logger(string.Format("killing thread as it timed out {0}", kc++));
+                                    if (worker.SimulateTimedOut)
+                                        Thread.Sleep(1000); // introduce delay for unit test to pick-up the condition
                                 }
                                 catch(Exception ex)
                                 {}
                             }
                         }
 
-                        var activeWorkers = downloadWorkers.Where(x => x != null && (x.Status == TaskStatus.Running || x.Status == TaskStatus.WaitingToRun));
+                        var activeWorkers = downloadWorkers.Where(x => x != null && 
+                            (x.Status == ThreadState.Running
+                            || x.Status == ThreadState.WaitSleepJoin)).ToList();
                         // respawn the missing workers if some had too many retries or were killed
 
                         //are any of the treads alive?
@@ -150,21 +168,22 @@ namespace Illumina.TerminalVelocity
                                 {
                                     if (downloadWorkers[i] == null)
                                     {
+                                        logger("reviving killed thread");
                                         downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
                                         downloadThrottle, expectedChunkDownloadTime, logger, ct);
                                         downloadWorkers[i].Start();
                                         continue;
                                     }
 
-                                    if (!(downloadWorkers[i].Status == TaskStatus.Running 
-                                        || downloadWorkers[i].Status == TaskStatus.WaitingToRun 
-                                        || downloadWorkers[i].Status == TaskStatus.RanToCompletion))
-                                    {
-                                        downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                        downloadThrottle, expectedChunkDownloadTime, logger, ct);
-                                        downloadWorkers[i].Start();
-                                    }
+                                    if (downloadWorkers[i].Status == ThreadState.Running
+                                        || downloadWorkers[i].Status == ThreadState.WaitSleepJoin
+                                        || downloadWorkers[i].Status == ThreadState.Background
+                                        || downloadWorkers[i].Status == ThreadState.Stopped) continue;
 
+                                    logger("reviving killed thread");
+                                    downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
+                                                                        downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                                    downloadWorkers[i].Start();
                                 }
                             }
                         }
@@ -201,25 +220,26 @@ namespace Illumina.TerminalVelocity
 
         public void Start()
         {
-            DownloadWorkerTask.Start();
+            DownloadWorkerThread.Start();
         }
         public void Wait(int time)
         {
-            DownloadWorkerTask.Wait(time);
+            DownloadWorkerThread.Join(time);
         }
         public void Wait(TimeSpan time)
         {
-            DownloadWorkerTask.Wait(time);
+            DownloadWorkerThread.Join(time);
         }
         public void Dispose()
         {
-            DownloadWorkerTask.Dispose();
+            DownloadWorkerThread.Abort();
+            DownloadWorkerThread = null;
         }
-        public TaskStatus Status
+        public ThreadState Status
         {
             get
             {
-                return DownloadWorkerTask.Status;
+                return DownloadWorkerThread.ThreadState;
             }
         }
 
@@ -241,10 +261,11 @@ namespace Illumina.TerminalVelocity
                             Func<ILargeFileDownloadParameters, 
                             ISimpleHttpGetByRangeClient> clientFactory = null)
         {
+            SimulateTimedOut = false;
             HeartBeat = DateTime.Now;
             cancellation = (cancellation != null) ? cancellation.Value : CancellationToken.None;
 
-            DownloadWorkerTask = new Task((() =>
+            DownloadWorkerThread = new Thread((() =>
                                  {
                                      clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri, bufferManager, expectedChunkTimeInSeconds * 1000 ));
                                      logger = logger ?? ((s) => { });
@@ -336,7 +357,7 @@ namespace Illumina.TerminalVelocity
                                          }
                                      }
                                      logger(String.Format("Thread {0} done" ,Thread.CurrentThread.ManagedThreadId));
-                                 }), cancellation.Value);
+                                 }));
 
         }
 
