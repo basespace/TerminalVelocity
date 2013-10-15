@@ -12,39 +12,39 @@ namespace Illumina.TerminalVelocity.Tests
     [TestFixture]
     public class LargeFileDownloadWithStreamParametersTests
     {
-        [TestCase(8, Category = "time-consuming")]
-        public void DownloadLargeFilesWithNonOptimizedStream(int threadCount)
-        {
-            string path = "";
-            try
-            {
-                var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
-                path = DownloadTests.SafePath("sites_vcf.gz");
-                Action<string> logger = (message) => { };
-                var timer = new Stopwatch();
-                timer.Start();
-                var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
-                LargeFileDownloadParameters.EnsureCleanFile(path, true);
-                using (var stream = new FileStream(path, FileMode.OpenOrCreate))
-                {
-                    ILargeFileDownloadParameters parameters = new LargeFileDownloadWithStreamParameters(uri, stream,
-                                                                                                        Constants.ONE_GIG_FILE_LENGTH,
-                                                                                                        maxThreads:
-                                                                                                            threadCount);
-                    Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
-                    task.Wait(TimeSpan.FromMinutes(15));
-                    timer.Stop();
+        //[TestCase(8, Category = "time-consuming")]
+        //public void DownloadLargeFilesWithNonOptimizedStream(int threadCount)
+        //{
+        //    string path = "";
+        //    try
+        //    {
+        //        var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
+        //        path = DownloadTests.SafePath("sites_vcf.gz");
+        //        Action<string> logger = (message) => { };
+        //        var timer = new Stopwatch();
+        //        timer.Start();
+        //        var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
+        //        LargeFileDownloadParameters.EnsureCleanFile(path, true);
+        //        using (var stream = new FileStream(path, FileMode.OpenOrCreate))
+        //        {
+        //            ILargeFileDownloadParameters parameters = new LargeFileDownloadWithStreamParameters(uri, stream,
+        //                                                                                                Constants.ONE_GIG_FILE_LENGTH,
+        //                                                                                                maxThreads:
+        //                                                                                                    threadCount);
+        //            Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
+        //            task.Wait(TimeSpan.FromMinutes(15));
+        //            timer.Stop();
 
-                    Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
-                    //try to open the file
-                    DownloadTests.ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
-                }
-            }
-            finally
-            {
-                File.Delete(path);
-            }
-        }
+        //            Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
+        //            //try to open the file
+        //            DownloadTests.ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
+        //        }
+        //    }
+        //    finally
+        //    {
+        //        File.Delete(path);
+        //    }
+        //}
 
         [TestCase(8)]
         public void DownloadSmallFilesWithNonOptimizedStream(int threadCount)
