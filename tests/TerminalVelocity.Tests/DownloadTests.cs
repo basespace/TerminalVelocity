@@ -311,7 +311,7 @@ namespace Illumina.TerminalVelocity.Tests
                   if (thread == null)
                       continue;
 
-                  if (thread.ThreadState == ThreadState.Running)
+                  if (thread.ThreadState == ThreadState.Running || thread.ThreadState == ThreadState.Stopped)
                   {
                       gotReplaced = true;
                       break;
@@ -321,7 +321,7 @@ namespace Illumina.TerminalVelocity.Tests
               Assert.IsTrue(gotReplaced);
 
               // make sure we have a successful download
-              task.Wait(TimeSpan.FromMinutes(5));
+              task.Wait(TimeSpan.FromMinutes(2));
               timer.Stop();
               Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
               //try to open the file

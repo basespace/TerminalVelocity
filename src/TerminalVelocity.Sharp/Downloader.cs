@@ -143,7 +143,7 @@ namespace Illumina.TerminalVelocity
                                     worker.DownloadWorkerThread.Abort(); // this has a minute chance of throwing
                                     logger(string.Format("killing thread as it timed out {0}", kc++));
                                     if (worker.SimulateTimedOut)
-                                        Thread.Sleep(1000); // introduce delay for unit test to pick-up the condition
+                                        Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
                                 }
                                 catch(Exception ex)
                                 {}
