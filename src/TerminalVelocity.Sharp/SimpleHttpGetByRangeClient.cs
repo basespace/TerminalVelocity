@@ -5,6 +5,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Illumina.TerminalVelocity
 {
@@ -142,9 +143,29 @@ Range: bytes={2}-{3}
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
                 if (baseUri.Scheme.ToLower() == "https")
                 {
-                    var sslStream = new SslStream(tcpClient.GetStream());
-                    sslStream.AuthenticateAsClient(baseUri.Host);
-                    stream = sslStream;
+					SslStream sslStream;
+
+					if (Helpers.IsRunningOnMono())
+					{
+						sslStream = new SslStream(
+							tcpClient.GetStream(),
+							false,
+							new RemoteCertificateValidationCallback(
+								delegate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+								{
+									return true;
+								}
+							),
+							null
+						);
+					}
+					else
+					{
+						sslStream = new SslStream(tcpClient.GetStream());
+					}
+
+					sslStream.AuthenticateAsClient(baseUri.Host);
+					stream = sslStream;
                 }
                 else
                 {
