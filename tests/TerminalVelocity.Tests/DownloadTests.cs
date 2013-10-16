@@ -96,6 +96,14 @@ namespace Illumina.TerminalVelocity.Tests
         }
 
         [Test]
+        public void ProgressBarShowsCorrectWhenChunkCountIsOne()
+        {
+            int chunkCount = 1;
+            int actual = Downloader.ComputeProgressIndicator(0, 1);
+          Assert.AreEqual(100, actual);
+        }
+
+        [Test]
         public void ThrottleDownloadWhenQueueIsFull()
         {
             var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000);
@@ -360,58 +368,58 @@ namespace Illumina.TerminalVelocity.Tests
 
           }
 
-          //[TestCase(32, Category = "time-consuming")]
-          //public void ParallelChunkedOneGig(int threadCount)
-          //{
-          //    string path = "";
-          //    try
-          //    {
-          //        var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
-          //        path = SafePath("sites_vcf.gz");
-          //        Action<string> logger = (message) => { };
-          //        var timer = new Stopwatch();
-          //        timer.Start();
-          //        var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
-          //        ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1297662912, null, maxThreads: threadCount);
-          //        Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
-          //        task.Wait(TimeSpan.FromMinutes(25));
-          //        timer.Stop();
-          //        Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
-          //        //try to open the file
-          //        ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
-          //    }
-          //    finally
-          //    {
-          //        File.Delete(path);
-          //    }
-          //}
+          [TestCase(32, Category = "time-consuming")]
+          public void ParallelChunkedOneGig(int threadCount)
+          {
+              string path = "";
+              try
+              {
+                  var uri = new Uri(Constants.ONE_GIG_FILE_S_SL);
+                  path = SafePath("sites_vcf.gz");
+                  Action<string> logger = (message) => { };
+                  var timer = new Stopwatch();
+                  timer.Start();
+                  var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
+                  ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1297662912, null, maxThreads: threadCount);
+                  Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
+                  task.Wait(TimeSpan.FromMinutes(25));
+                  timer.Stop();
+                  Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
+                  //try to open the file
+                  ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
+              }
+              finally
+              {
+                  File.Delete(path);
+              }
+          }
 
-          //[TestCase(16, Category = "time-consuming")]
-          //public void ParallelChunkedThirteenGig(int threadCount)
-          //{
-          //    string path = "";
-          //    try
-          //    {
-          //        var uri = new Uri(Constants.THIRTEEN_GIG_BAD_SAMPLE);
-          //        path = SafePath("RZ-UHR_S1_L001_R2_001.fastq.gz");
-          //        Action<string> logger = (message) => { };
-          //        var timer = new Stopwatch();
-          //        timer.Start();
-          //        var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
-          //        ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, Constants.THIRTEEN_GIG_FILE_LENGTH, maxThreads: threadCount);
-          //        Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
-          //        task.Wait(TimeSpan.FromMinutes(30));
-          //        timer.Stop();
-          //        Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
-          //        //try to open the file
-          //        ValidateGZip(path, parameters.FileSize, Constants.THIRTEEN_GIG_CHECKSUM);
+          [TestCase(16, Category = "time-consuming")]
+          public void ParallelChunkedThirteenGig(int threadCount)
+          {
+              string path = "";
+              try
+              {
+                  var uri = new Uri(Constants.THIRTEEN_GIG_BAD_SAMPLE);
+                  path = SafePath("RZ-UHR_S1_L001_R2_001.fastq.gz");
+                  Action<string> logger = (message) => { };
+                  var timer = new Stopwatch();
+                  timer.Start();
+                  var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
+                  ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, Constants.THIRTEEN_GIG_FILE_LENGTH, maxThreads: threadCount);
+                  Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
+                  task.Wait(TimeSpan.FromMinutes(30));
+                  timer.Stop();
+                  Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
+                  //try to open the file
+                  ValidateGZip(path, parameters.FileSize, Constants.THIRTEEN_GIG_CHECKSUM);
 
-          //    }
-          //    finally
-          //    {
-          //        File.Delete(path);
-          //    }
-          //}
+              }
+              finally
+              {
+                  File.Delete(path);
+              }
+          }
 
 
           [Test()]
@@ -543,10 +551,29 @@ namespace Illumina.TerminalVelocity.Tests
             var timer = new Stopwatch();
             timer.Start();
             ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, null, maxThreads: 8);
-            Task task = parameters.DownloadAsync(logger: logger);
+            Task task = parameters.DownloadAsync(logger: logger, progress: new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>( s=> logger("progress")));
             task.Wait(TimeSpan.FromMinutes(1));
             timer.Stop();
             Debug.WriteLine("Took {0} threads {1} ms", 8, timer.ElapsedMilliseconds);
+            //try to open the file
+            ValidateGZip(path, parameters.FileSize, Constants.FIVE_MEG_CHECKSUM);
+        }
+
+        [Test]
+        public void DownloadSmallerInSingleChunk()
+        {
+           
+            var uri = new Uri(Constants.FIVE_MEG_FILE);
+            var path = SafePath("sites_vcf.gz");
+            Action<string> logger = (message) => { };
+            var timer = new Stopwatch();
+            timer.Start();
+            
+            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, maxChunkSize: Constants.FIVE_MEG_LENGTH, maxThreads: 1);
+            Task task = parameters.DownloadAsync(logger: logger, progress: new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>( s=> logger("progress")) );
+            task.Wait(TimeSpan.FromMinutes(5));
+            timer.Stop();
+            Debug.WriteLine("Took {0} threads {1} ms", 1, timer.ElapsedMilliseconds);
             //try to open the file
             ValidateGZip(path, parameters.FileSize, Constants.FIVE_MEG_CHECKSUM);
         }
@@ -577,7 +604,7 @@ namespace Illumina.TerminalVelocity.Tests
                  }
         }
 
-
+        
         public static string SafePath(string fileName)
         {
             string path = Path.Combine(Environment.CurrentDirectory,fileName);

@@ -246,6 +246,10 @@ namespace Illumina.TerminalVelocity
 
         public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
         {
+            if (chunkCount == 1)
+            {
+                return 100;
+            }
             return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
         }
 

@@ -21,6 +21,7 @@ namespace Illumina.TerminalVelocity.Tests
         public const int TWENTY_MEG_FILE_LENGTH = 29996532;
         public const string FIVE_MEG_FILE = @"https://cloud-internal-test.s3.amazonaws.com/22ae3296a2e843ff9242a226011c93bf/UnitTestFile_110120?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1440635462&Signature=rUizUG0KuoCrqrU3%2BGOLtQlE%2BcU%3D";
         public const string FIVE_MEG_CHECKSUM = @"ec1a47cd2f40ba8f94ec2be5aef86aba";
+        public const int FIVE_MEG_LENGTH = 5242880;
 
         public const string ZERO_BYTE_FILE =
             @"https://1000genomes.s3.amazonaws.com/technical/method_development?AWSAccessKeyId=AKIAIYDIF27GS5AAXHQQ&Expires=1504977056&Signature=PlWjI2VsAWYuRH18WinlP6Sa2TM%3D";
