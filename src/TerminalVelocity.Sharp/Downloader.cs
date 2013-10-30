@@ -28,13 +28,7 @@ namespace Illumina.TerminalVelocity
         public Thread DownloadWorkerThread { get; set; }
         public DateTime HeartBeat { get; set; }
 
-        // needed for Unit Testing
-        internal bool SimulateTimedOut { get; set; }
-        // needed for Unit Testing
-        internal static ConcurrentDictionary<int, List<Downloader>> ParentThreadToDownloaders= new ConcurrentDictionary<int, List<Downloader>>();
-
-
-        internal static void StartDownloading(CancellationToken ct, 
+      internal static void StartDownloading(CancellationToken ct, 
             ILargeFileDownloadParameters parameters, 
             IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
             Action<string> logger = null, 
@@ -61,12 +55,8 @@ namespace Illumina.TerminalVelocity
             int chunkCount = GetChunkCount(parameters.FileSize, parameters.MaxChunkSize);
             int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
             logger = logger ?? ((s) => { });
-
-            int currentThread = Thread.CurrentThread.ManagedThreadId;
-
             var downloadWorkers = new List<Downloader>(numberOfThreads);
 
-            ParentThreadToDownloaders.AddOrUpdate(currentThread, (t) => downloadWorkers, (t,u) => downloadWorkers);
             try
             {
 
@@ -128,8 +118,6 @@ namespace Illumina.TerminalVelocity
                             .Where(w => w.Status == ThreadState.Running || w.Status == ThreadState.WaitSleepJoin)
                             .Where((w) =>
                                {
-                                   if (w.SimulateTimedOut)
-                                       return true;
                                    return w.HeartBeat.AddSeconds(expectedChunkDownloadTime) < DateTime.Now;
                                })
                        .ToList();
@@ -142,8 +130,7 @@ namespace Illumina.TerminalVelocity
                                 {
                                     worker.DownloadWorkerThread.Abort(); // this has a minute chance of throwing
                                     logger(string.Format("killing thread as it timed out {0}", kc++));
-                                    if (worker.SimulateTimedOut)
-                                        Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
+                                    
                                 }
                                 catch(Exception ex)
                                 {}
@@ -265,8 +252,7 @@ namespace Illumina.TerminalVelocity
                             Func<ILargeFileDownloadParameters, 
                             ISimpleHttpGetByRangeClient> clientFactory = null)
         {
-            SimulateTimedOut = false;
-            HeartBeat = DateTime.Now;
+              HeartBeat = DateTime.Now;
             cancellation = (cancellation != null) ? cancellation.Value : CancellationToken.None;
 
             DownloadWorkerThread = new Thread((() =>
