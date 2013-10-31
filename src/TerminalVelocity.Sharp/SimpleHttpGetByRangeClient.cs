@@ -25,7 +25,7 @@ Range: bytes={2}-{3}
         internal const string INVALID_HEADER_LENGTH = "Invalid Header length";
         internal const string STREAM_CLOSED_ERROR = "The stream is not returning any more data";
         public static readonly byte[] BODY_INDICATOR = new byte[] { 13, 10, 13, 10 };
-        public const int BUFFER_SIZE = 9000;
+        public const int BUFFER_SIZE = 36000; // GV: I noticed the read chunk unit on ec2 is 18kb, setting to 36kb just in case
         public const int DEFAULT_TIMEOUT = 1000 * 10; //10 seconds a single 20k buffer read shouldn't take more than 10s
         private TcpClient tcpClient;
         private Uri baseUri;
