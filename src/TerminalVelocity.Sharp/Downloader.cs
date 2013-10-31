@@ -151,8 +151,7 @@ namespace Illumina.TerminalVelocity
                     // respawn the missing workers if some had too many retries or were killed
 
                     //wait for something that was added
-                    Thread.Sleep(100); // making this wait 1s increases single file throughput but makes small serial file downloads take too long
-
+                    Thread.Sleep(100); 
                     if (activeWorkers.Count() < numberOfThreads)
                     {
                         for (int i = 0; i < numberOfThreads; i++)
