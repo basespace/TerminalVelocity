@@ -13,12 +13,6 @@ namespace Illumina.TerminalVelocity
         public const string REQUEST_TEMPLATE = @"GET {0} HTTP/1.1
 Host: {1}
 Connection: keep-alive
-Cache-Control: no-cache
-User-Agent: Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.22 (KHTML, like Gecko) Chrome/25.0.1364.97 Safari/537.22
-Accept: */*
-Accept-Encoding: gzip
-Accept-Language: en-US,en;q=0.8
-Accept-Charset: utf-8;q=0.7,*;q=0.3
 Range: bytes={2}-{3}
 
 ";
