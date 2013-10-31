@@ -78,7 +78,6 @@ namespace Illumina.TerminalVelocity
                 // ReSharper disable AccessToModifiedClosure
                 Func<int, bool> downloadThrottle = (int c) => writeQueue.Count > 30;
                 // ReSharper restore AccessToModifiedClosure
-                var addEvent = new AutoResetEvent(false);
                 if (bufferManager == null)
                 {
 
@@ -94,7 +93,7 @@ namespace Illumina.TerminalVelocity
 
                 for (int i = 0; i < numberOfThreads; i++)
                 {
-                    downloadWorkers.Add(new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
+                    downloadWorkers.Add(new Downloader(bufferManager, parameters, writeQueue, readStack,
                                         downloadThrottle, expectedChunkDownloadTime, logger, ct));
                 }
                 //start all the download threads
@@ -105,7 +104,7 @@ namespace Illumina.TerminalVelocity
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
                 {
                     ChunkedFilePart part;
-                    if (writeQueue.TryDequeue(out part))
+                    while (writeQueue.TryDequeue(out part))
                     {
                         //retry?
                         logger(string.Format("writing: {0}", writtenChunkZeroBased));
@@ -118,69 +117,67 @@ namespace Illumina.TerminalVelocity
                         }
                         writtenChunkZeroBased++;
                     }
-                    else
+
+                    // kill hanged workers
+                    var timedOutWorkers = downloadWorkers
+                        .Where(w => w.Status == ThreadState.Running || w.Status == ThreadState.WaitSleepJoin)
+                        .Where((w) =>
+                           {
+                               if (w.SimulateTimedOut)
+                                   return true;
+                               return w.HeartBeat.AddSeconds(expectedChunkDownloadTime) < DateTime.Now;
+                           })
+                   .ToList();
+
+                    if (timedOutWorkers.Any())
                     {
-                        // kill hanged workers
-                        var timedOutWorkers = downloadWorkers
-                            .Where(w => w.Status == ThreadState.Running || w.Status == ThreadState.WaitSleepJoin)
-                            .Where((w) =>
-                               {
-                                   if (w.SimulateTimedOut)
-                                       return true;
-                                   return w.HeartBeat.AddSeconds(expectedChunkDownloadTime) < DateTime.Now;
-                               })
-                       .ToList();
-
-                        if (timedOutWorkers.Any())
+                        foreach (var worker in timedOutWorkers)
                         {
-                            foreach (var worker in timedOutWorkers)
+                            try
                             {
-                                try
-                                {
-                                    worker.DownloadWorkerThread.Abort(); // this has a minute chance of throwing
-                                    logger(string.Format("killing thread as it timed out {0}", kc++));
-                                    if (worker.SimulateTimedOut)
-                                        Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
-                                }
-                                catch (Exception ex)
-                                { }
+                                worker.DownloadWorkerThread.Abort(); // this has a minute chance of throwing
+                                logger(string.Format("killing thread as it timed out {0}", kc++));
+                                if (worker.SimulateTimedOut)
+                                    Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
                             }
-                        }
-
-                        var activeWorkers = downloadWorkers.Where(x => x != null &&
-                            (x.Status == ThreadState.Running
-                            || x.Status == ThreadState.WaitSleepJoin)).ToList();
-                        // respawn the missing workers if some had too many retries or were killed
-
-                        //wait for something that was added
-                        addEvent.WaitOne(100);
-                        addEvent.Reset();
-
-                        if (activeWorkers.Count() < numberOfThreads)
-                        {
-                            for (int i = 0; i < numberOfThreads; i++)
-                            {
-                                if (downloadWorkers[i] == null)
-                                {
-                                    logger("reviving killed thread");
-                                    downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                    downloadThrottle, expectedChunkDownloadTime, logger, ct);
-                                    downloadWorkers[i].Start();
-                                    continue;
-                                }
-
-                                if (downloadWorkers[i].Status == ThreadState.Running
-                                    || downloadWorkers[i].Status == ThreadState.WaitSleepJoin
-                                    || downloadWorkers[i].Status == ThreadState.Background
-                                    || downloadWorkers[i].Status == ThreadState.Stopped) continue;
-
-                                logger("reviving killed thread");
-                                downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                                                    downloadThrottle, expectedChunkDownloadTime, logger, ct);
-                                downloadWorkers[i].Start();
-                            }
+                            catch (Exception ex)
+                            { }
                         }
                     }
+
+                    var activeWorkers = downloadWorkers.Where(x => x != null &&
+                        (x.Status == ThreadState.Running
+                        || x.Status == ThreadState.WaitSleepJoin)).ToList();
+                    // respawn the missing workers if some had too many retries or were killed
+
+                    //wait for something that was added
+                    Thread.Sleep(100);
+
+                    if (activeWorkers.Count() < numberOfThreads)
+                    {
+                        for (int i = 0; i < numberOfThreads; i++)
+                        {
+                            if (downloadWorkers[i] == null)
+                            {
+                                logger("reviving killed thread");
+                                downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
+                                downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                                downloadWorkers[i].Start();
+                                continue;
+                            }
+
+                            if (downloadWorkers[i].Status == ThreadState.Running
+                                || downloadWorkers[i].Status == ThreadState.WaitSleepJoin
+                                || downloadWorkers[i].Status == ThreadState.Background
+                                || downloadWorkers[i].Status == ThreadState.Stopped) continue;
+
+                            logger("reviving killed thread");
+                            downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
+                                                                downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                            downloadWorkers[i].Start();
+                        }
+                    }
+
                 }
             }
             catch (Exception e)
@@ -245,7 +242,6 @@ namespace Illumina.TerminalVelocity
         internal Downloader(BufferManager bufferManager, 
                             ILargeFileDownloadParameters parameters,
                             ConcurrentQueue<ChunkedFilePart> writeQueue,
-                            AutoResetEvent reset, 
                             ConcurrentStack<int> readStack,
                             Func<int, bool> downloadThrottle, 
                             int expectedChunkTimeInSeconds, 
@@ -260,7 +256,10 @@ namespace Illumina.TerminalVelocity
 
             DownloadWorkerThread = new Thread((() =>
                                  {
+                                     try
+                                     {
                                      clientFactory = clientFactory ?? ((p) => new SimpleHttpGetByRangeClient(p.Uri, bufferManager, expectedChunkTimeInSeconds * 1000 ));
+
                                      logger = logger ?? ((s) => { });
 
                                      ISimpleHttpGetByRangeClient client = clientFactory(parameters);
@@ -304,7 +303,6 @@ namespace Illumina.TerminalVelocity
                                                  // reset the throttle when the part is finally successful
                                                  delayThrottle = 0;
                                                  logger(string.Format("downloaded: {0}", currentChunk));
-                                                 reset.Set();
 
                                                  HeartBeat = DateTime.Now;
 
@@ -350,6 +348,13 @@ namespace Illumina.TerminalVelocity
                                          }
                                      }
                                      logger(String.Format("Thread {0} done" ,Thread.CurrentThread.ManagedThreadId));
+                                     }
+                                     catch (ThreadAbortException exc)
+                                     {
+                                         Console.WriteLine(exc);
+                                         Thread.Sleep(1000);
+                                         throw;
+                                     }
                                  }));
 
         }

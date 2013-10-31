@@ -192,7 +192,6 @@ namespace Illumina.TerminalVelocity.Tests
         {
             var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000, verifyLength: false);
             var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
-            var e = new AutoResetEvent(false);
 
             byte[] sampleResponse = Encoding.UTF8.GetBytes("hello world");
             var mockClient = new Mock<ISimpleHttpGetByRangeClient>();
@@ -215,7 +214,7 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = new Downloader(bufferManager, parameters, writeQueue, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = new Downloader(bufferManager, parameters, writeQueue, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
