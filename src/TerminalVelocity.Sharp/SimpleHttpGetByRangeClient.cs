@@ -140,15 +140,22 @@ Range: bytes={2}-{3}
 
                 tcpClient.ReceiveTimeout = timeout;
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
+
+                var clientStream = tcpClient.GetStream();
+                clientStream.ReadTimeout = 5000;
+                clientStream.WriteTimeout = 5000;
+
                 if (baseUri.Scheme.ToLower() == "https")
                 {
-                    var sslStream = new SslStream(tcpClient.GetStream());
+                    var sslStream = new SslStream(clientStream);
+                    sslStream.ReadTimeout = 5000;
+                    sslStream.WriteTimeout = 5000;
                     sslStream.AuthenticateAsClient(baseUri.Host);
                     stream = sslStream;
                 }
                 else
                 {
-                    stream = tcpClient.GetStream();
+                    stream = clientStream;
                 }
 
             }
