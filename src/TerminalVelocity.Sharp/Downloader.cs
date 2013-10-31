@@ -31,7 +31,6 @@ namespace Illumina.TerminalVelocity
         // needed for Unit Testing
         internal bool SimulateTimedOut { get; set; }
         // needed for Unit Testing
-        internal static ConcurrentDictionary<int, List<Downloader>> ParentThreadToDownloaders= new ConcurrentDictionary<int, List<Downloader>>();
 
 
         internal static void StartDownloading(CancellationToken ct, 
@@ -66,7 +65,6 @@ namespace Illumina.TerminalVelocity
 
             var downloadWorkers = new List<Downloader>(numberOfThreads);
 
-            ParentThreadToDownloaders.AddOrUpdate(currentThread, (t) => downloadWorkers, (t,u) => downloadWorkers);
             try
             {
 
