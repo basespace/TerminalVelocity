@@ -142,51 +142,43 @@ namespace Illumina.TerminalVelocity
                                     if (worker.SimulateTimedOut)
                                         Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
                                 }
-                                catch(Exception ex)
-                                {}
+                                catch (Exception ex)
+                                { }
                             }
                         }
 
-                        var activeWorkers = downloadWorkers.Where(x => x != null && 
+                        var activeWorkers = downloadWorkers.Where(x => x != null &&
                             (x.Status == ThreadState.Running
                             || x.Status == ThreadState.WaitSleepJoin)).ToList();
                         // respawn the missing workers if some had too many retries or were killed
 
-                        //are any of the treads alive?
-                        if (activeWorkers.Any())
+                        //wait for something that was added
+                        addEvent.WaitOne(100);
+                        addEvent.Reset();
+
+                        if (activeWorkers.Count() < numberOfThreads)
                         {
-                            //wait for something that was added
-                            addEvent.WaitOne(100);
-                            addEvent.Reset();
-
-                            if (activeWorkers.Count() < numberOfThreads)
+                            for (int i = 0; i < numberOfThreads; i++)
                             {
-                                for (int i=0; i< numberOfThreads; i++)
+                                if (downloadWorkers[i] == null)
                                 {
-                                    if (downloadWorkers[i] == null)
-                                    {
-                                        logger("reviving killed thread");
-                                        downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                        downloadThrottle, expectedChunkDownloadTime, logger, ct);
-                                        downloadWorkers[i].Start();
-                                        continue;
-                                    }
-
-                                    if (downloadWorkers[i].Status == ThreadState.Running
-                                        || downloadWorkers[i].Status == ThreadState.WaitSleepJoin
-                                        || downloadWorkers[i].Status == ThreadState.Background
-                                        || downloadWorkers[i].Status == ThreadState.Stopped) continue;
-
                                     logger("reviving killed thread");
                                     downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
-                                                                        downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                                    downloadThrottle, expectedChunkDownloadTime, logger, ct);
                                     downloadWorkers[i].Start();
+                                    continue;
                                 }
+
+                                if (downloadWorkers[i].Status == ThreadState.Running
+                                    || downloadWorkers[i].Status == ThreadState.WaitSleepJoin
+                                    || downloadWorkers[i].Status == ThreadState.Background
+                                    || downloadWorkers[i].Status == ThreadState.Stopped) continue;
+
+                                logger("reviving killed thread");
+                                downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, addEvent, readStack,
+                                                                    downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                                downloadWorkers[i].Start();
                             }
-                        }
-                        else
-                        {
-                            throw new Exception("All threads were killed");
                         }
                     }
                 }
