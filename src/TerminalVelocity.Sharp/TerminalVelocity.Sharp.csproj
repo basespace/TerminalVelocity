@@ -72,7 +72,6 @@
     <Compile Include="SocketErrorCodes.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
     <None Include="TerminalVelocity.Sharp.nuspec" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
