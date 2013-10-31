@@ -26,7 +26,7 @@ Range: bytes={2}-{3}
         internal const string STREAM_CLOSED_ERROR = "The stream is not returning any more data";
         public static readonly byte[] BODY_INDICATOR = new byte[] { 13, 10, 13, 10 };
         public const int BUFFER_SIZE = 9000;
-        public const int DEFAULT_TIMEOUT = 1000 * 200; //200 seconds
+        public const int DEFAULT_TIMEOUT = 1000 * 10; //10 seconds a single 20k buffer read shouldn't take more than 10s
         private TcpClient tcpClient;
         private Uri baseUri;
         private Stream stream;
@@ -113,6 +113,7 @@ Range: bytes={2}-{3}
                 if (tcpClient != null)
                 {
                     tcpClient.ReceiveTimeout = value;
+                    tcpClient.SendTimeout = value;
                 }
                 timeout = value;
             }
@@ -142,14 +143,10 @@ Range: bytes={2}-{3}
                 tcpClient.Connect(baseUri.Host, baseUri.Port);
 
                 var clientStream = tcpClient.GetStream();
-                clientStream.ReadTimeout = 5000;
-                clientStream.WriteTimeout = 5000;
 
                 if (baseUri.Scheme.ToLower() == "https")
                 {
                     var sslStream = new SslStream(clientStream);
-                    sslStream.ReadTimeout = 5000;
-                    sslStream.WriteTimeout = 5000;
                     sslStream.AuthenticateAsClient(baseUri.Host);
                     stream = sslStream;
                 }
