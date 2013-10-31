@@ -61,7 +61,6 @@ namespace Illumina.TerminalVelocity
             int numberOfThreads = Math.Min(parameters.MaxThreads, chunkCount);
             logger = logger ?? ((s) => { });
 
-            int currentThread = Thread.CurrentThread.ManagedThreadId;
 
             var downloadWorkers = new List<Downloader>(numberOfThreads);
 
