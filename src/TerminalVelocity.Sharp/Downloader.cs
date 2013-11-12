@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ThreadState = System.Threading.ThreadState;
 
 namespace Illumina.TerminalVelocity
 {
@@ -103,6 +105,10 @@ namespace Illumina.TerminalVelocity
                 //start all the download threads
                 downloadWorkers.ForEach(x => x.Start());
 
+                Stopwatch watch = new Stopwatch();
+                watch.Start();
+                long oldElapsedMilliSeconds = watch.ElapsedMilliseconds;
+                long lastPointInFile = 0;
                 int kc = 0;
                 //start the write loop
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
@@ -117,7 +123,19 @@ namespace Illumina.TerminalVelocity
                         bufferManager.FreeBuffer(part.Content);
                         if (progress != null)
                         {
-                            progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount), null));
+                            var elapsed = watch.ElapsedMilliseconds;
+                            var diff = elapsed - oldElapsedMilliSeconds;
+                            if (diff > 2000)
+                            {
+                                var bytesDownloaded = writtenChunkZeroBased * parameters.MaxChunkSize;
+                                var interimReads = bytesDownloaded + part.Length - lastPointInFile;
+                                var byteWriteRate = (interimReads / (diff / (double)1000));                                
+
+                                lastPointInFile += interimReads;                                
+                                oldElapsedMilliSeconds = elapsed;
+                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount), 
+                                                                                              byteWriteRate, byteWriteRate, bytesDownloaded, bytesDownloaded, "", "", null));
+                            }
                         }
                         writtenChunkZeroBased++;
                     }
