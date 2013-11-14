@@ -127,9 +127,9 @@ namespace Illumina.TerminalVelocity
                             var diff = elapsed - oldElapsedMilliSeconds;
                             if (diff > 2000)
                             {
-                                var bytesDownloaded = writtenChunkZeroBased * parameters.MaxChunkSize;
-                                var interimReads = bytesDownloaded + part.Length - lastPointInFile;
-                                var byteWriteRate = (interimReads / (diff / (double)1000));                                
+                                long bytesDownloaded = (long) writtenChunkZeroBased * parameters.MaxChunkSize;
+                                long interimReads = bytesDownloaded + part.Length - lastPointInFile;
+                                double byteWriteRate = (interimReads / (diff / (double)1000));                                
 
                                 lastPointInFile += interimReads;                                
                                 oldElapsedMilliSeconds = elapsed;
