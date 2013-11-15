@@ -31,7 +31,7 @@ namespace Illumina.TerminalVelocity
         public BufferManager(IEnumerable<BufferQueueSetting> buffers)
         {
             
-            this.AllocateBuffers(buffers);
+            AllocateBuffers(buffers);
         }
 
         /// <summary>

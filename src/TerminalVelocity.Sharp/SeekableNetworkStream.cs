@@ -41,7 +41,7 @@ namespace Illumina.TerminalVelocity
             }
             this.url = url;
             this.cacheSize = cacheSize;
-            this.currentCacheSize = cacheSize;
+            currentCacheSize = cacheSize;
         }
 
 

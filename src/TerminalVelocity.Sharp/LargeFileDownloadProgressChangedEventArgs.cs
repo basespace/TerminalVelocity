@@ -14,12 +14,12 @@ namespace Illumina.TerminalVelocity
         public LargeFileDownloadProgressChangedEventArgs(int progressPercentage, double downloadBitRate, double writeBitRate, long bytesWritten, long bytesDownloaded, string url, string id, object userState, bool isFailed = false, string reasonForFailure = "")
             : base(progressPercentage, userState)
         {
-            this.DownloadBitRate = downloadBitRate;
-            this.WriteBitRate = writeBitRate;
-            this.BytesWritten = bytesWritten;
-            this.BytesDownloaded = bytesDownloaded;
-            this.Url = url;
-            this.Id = id;
+            DownloadBitRate = downloadBitRate;
+            WriteBitRate = writeBitRate;
+            BytesWritten = bytesWritten;
+            BytesDownloaded = bytesDownloaded;
+            Url = url;
+            Id = id;
             IsFailed = isFailed;
             ReasonForFailure = reasonForFailure;
         }

@@ -35,7 +35,6 @@ namespace Illumina.TerminalVelocity
         // needed for Unit Testing
         internal static ConcurrentDictionary<int, List<Downloader>> ParentThreadToDownloaders= new ConcurrentDictionary<int, List<Downloader>>();
 
-
         internal static void StartDownloading(CancellationToken ct, 
             ILargeFileDownloadParameters parameters, 
             IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
@@ -55,7 +54,9 @@ namespace Illumina.TerminalVelocity
                                                                                   null));
                 }
                 if (parameters.AutoCloseStream)
+                {
                     stream.Close();
+                }
                 return;
             }
 
@@ -133,8 +134,8 @@ namespace Illumina.TerminalVelocity
 
                                 lastPointInFile += interimReads;                                
                                 oldElapsedMilliSeconds = elapsed;
-                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount), 
-                                                                                              byteWriteRate, byteWriteRate, bytesDownloaded, bytesDownloaded, "", "", null));
+                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount),
+                                                                                              byteWriteRate, byteWriteRate, interimReads, interimReads, "", "", null));
                             }
                         }
                         writtenChunkZeroBased++;
