@@ -65,7 +65,7 @@ namespace Illumina.TerminalVelocity
                         throw;
 
                     var delay = (int) Math.Min(maxTimeOut, Math.Pow(retry, 5));
-                    System.Threading.Thread.Sleep(delay);
+                    System.Threading.Thread.Sleep(1000 * delay);
                 }
             }
             throw new Exception("Response was not successful");
