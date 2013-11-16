@@ -70,6 +70,7 @@ namespace Illumina.TerminalVelocity
             var downloadWorkers = new List<Downloader>(numberOfThreads);
 
             ParentThreadToDownloaders.AddOrUpdate(currentThread, (t) => downloadWorkers, (t,u) => downloadWorkers);
+            bool isFailed = false;
             try
             {
 
@@ -135,7 +136,7 @@ namespace Illumina.TerminalVelocity
                                 lastPointInFile += interimReads;                                
                                 oldElapsedMilliSeconds = elapsed;
                                 progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount),
-                                                                                              byteWriteRate, byteWriteRate, interimReads, interimReads, "", "", null));
+                                                                                              byteWriteRate, byteWriteRate, bytesDownloaded, bytesDownloaded, "", "", null));
                             }
                         }
                         writtenChunkZeroBased++;
@@ -216,7 +217,8 @@ namespace Illumina.TerminalVelocity
             catch (Exception e)
             {
                 // Report Failure
-                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, true, e.Message));
+                isFailed = true;
+                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, isFailed, e.Message));
             }
             finally
             {
@@ -232,6 +234,8 @@ namespace Illumina.TerminalVelocity
                 }
                 if (parameters.AutoCloseStream)
                 {
+                    //Sujit: for small files none of the above progress change event fires, so forcing it to fire at time of closing the file
+                    progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, isFailed));
                     stream.Close();
                 }
             }
@@ -316,10 +320,7 @@ namespace Illumina.TerminalVelocity
                                              }
                                              catch (Exception e)
                                              {
-                                                 if (e.InnerException != null)
-                                                     logger(e.InnerException.Message);
-                                                 else
-                                                     logger(e.Message);
+                                                 logger(e.InnerException != null ? e.InnerException.Message : e.Message);
 
                                                  ExecuteAndSquash(client.Dispose);
                                                  client = clientFactory(parameters);
