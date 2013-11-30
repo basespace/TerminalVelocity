@@ -165,7 +165,7 @@ namespace Illumina.TerminalVelocity
                                     if (worker.SimulateTimedOut)
                                         Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
                                 }
-                                catch(Exception ex)
+                                catch(Exception)
                                 {}
                             }
                         }
