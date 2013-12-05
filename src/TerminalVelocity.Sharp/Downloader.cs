@@ -71,6 +71,7 @@ namespace Illumina.TerminalVelocity
 
             ParentThreadToDownloaders.AddOrUpdate(currentThread, (t) => downloadWorkers, (t,u) => downloadWorkers);
             bool isFailed = false;
+            long totalBytesWritten = 0;
             try
             {
 
@@ -110,7 +111,7 @@ namespace Illumina.TerminalVelocity
                 Stopwatch watch = new Stopwatch();
                 watch.Start();
                 long oldElapsedMilliSeconds = watch.ElapsedMilliseconds;
-                long lastPointInFile = 0;
+                long lastPointInFile = 0;                
                 int kc = 0;
                 //start the write loop
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
@@ -122,7 +123,9 @@ namespace Illumina.TerminalVelocity
                         logger(string.Format("writing: {0}", writtenChunkZeroBased));
                         stream.Position = part.FileOffset;
                         stream.Write(part.Content, 0, part.Length);
+                        totalBytesWritten += part.Length;
                         bufferManager.FreeBuffer(part.Content);
+
                         if (progress != null)
                         {
                             var elapsed = watch.ElapsedMilliseconds;
@@ -135,8 +138,8 @@ namespace Illumina.TerminalVelocity
 
                                 lastPointInFile += interimReads;                                
                                 oldElapsedMilliSeconds = elapsed;
-                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount),
-                                                                                              byteWriteRate, byteWriteRate, bytesDownloaded, bytesDownloaded, "", "", null));
+                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize),
+                                                                                              byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null));
                             }
                         }
                         writtenChunkZeroBased++;
@@ -144,6 +147,7 @@ namespace Illumina.TerminalVelocity
                     else
                     {
                         // kill hanged workers
+                        logger("kill hanged workers");
                         var timedOutWorkers = downloadWorkers
                             .Where(w => w.Status == ThreadState.Running || w.Status == ThreadState.WaitSleepJoin)
                             .Where((w) =>
@@ -218,16 +222,20 @@ namespace Illumina.TerminalVelocity
             {
                 // Report Failure
                 isFailed = true;
-                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, isFailed, e.Message));
+                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed, e.Message));
             }
             finally
             {
                 //kill all the tasks if exist
                 if (downloadWorkers != null)
                 {
+                    logger("kill all the tasks if exist");
                     downloadWorkers.ForEach(x =>
                     {
-                        if (x == null) return;
+                        if (x == null)
+                        {
+                            return;
+                        }
 
                         ExecuteAndSquash(x.Dispose);
                     });
@@ -235,10 +243,12 @@ namespace Illumina.TerminalVelocity
                 if (parameters.AutoCloseStream)
                 {
                     //Sujit: for small files none of the above progress change event fires, so forcing it to fire at time of closing the file
-                    progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, isFailed));
+                    progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed));
+                    logger("AutoClosing stream");
                     stream.Close();
                 }
             }
+            logger("StartDownloading() exitted");
         }
 
         public void Start()
@@ -254,7 +264,7 @@ namespace Illumina.TerminalVelocity
             DownloadWorkerThread.Join(time);
         }
         public void Dispose()
-        {
+        {            
             DownloadWorkerThread.Abort();
             DownloadWorkerThread = null;
         }
@@ -267,13 +277,15 @@ namespace Illumina.TerminalVelocity
         }
 
 
-        public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
+        public static int ComputeProgressIndicator(long bytesWritten, long fileSize)
         {
-            if (chunkCount == 1)
-            {
-                return 100;
-            }
-            return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
+            return (int) ((bytesWritten/(double)fileSize)*100.0);
+            //if (chunkCount == 1)
+            //{
+            //    return 100;
+            //}
+            //return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
+
         }
 
         internal Downloader(BufferManager bufferManager, 
