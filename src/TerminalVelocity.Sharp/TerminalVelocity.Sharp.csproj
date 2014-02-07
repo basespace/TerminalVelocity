@@ -37,6 +37,12 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>..\..\..\SpaceElevator\src\SpaceElevator.Client\IlluminaStrongNameKey.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -72,6 +78,9 @@
     <Compile Include="SocketErrorCodes.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\SpaceElevator\src\SpaceElevator.Client\IlluminaStrongNameKey.snk">
+      <Link>IlluminaStrongNameKey.snk</Link>
+    </None>
     <None Include="TerminalVelocity.Sharp.nuspec" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
