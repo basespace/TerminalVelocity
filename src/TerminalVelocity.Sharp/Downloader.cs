@@ -147,7 +147,7 @@ namespace Illumina.TerminalVelocity
                     else
                     {
                         // kill hanged workers
-                        logger("kill hanged workers");
+						//spk logger("kill hanged workers");
                         var timedOutWorkers = downloadWorkers
                             .Where(w => w.Status == ThreadState.Running || w.Status == ThreadState.WaitSleepJoin)
                             .Where((w) =>
