@@ -213,7 +213,7 @@ namespace Illumina.TerminalVelocity
                         }
                         else
                         {
-                            throw new Exception("All threads were killed");
+                            throw new Exception("[fildID:" + parameters.Id + "]" + "All threads were killed");
                         }
                     }
                 }
@@ -222,6 +222,9 @@ namespace Illumina.TerminalVelocity
             {
                 // Report Failure
                 isFailed = true;
+                logger("Exception: TerminalVelocity Downloading failed " + "[fildID:" + parameters.Id + "]");
+                logger("Exception: [fildID:" + parameters.Id + "]" + e.Message);
+                logger("Exception: [fildID:" + parameters.Id + "]" + e.StackTrace);
                 progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed, e.Message));
             }
             finally
