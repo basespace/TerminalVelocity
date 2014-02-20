@@ -53,7 +53,7 @@ namespace Illumina.TerminalVelocity.Tests
         [ExpectedException(typeof(SocketException))]
         public void GetContentLengthThrowsOnInvalidUrl()
         {
-            var fileSize = new Uri("http://blah.com").GetContentLength();
+            var fileSize = new Uri("http://blah.halb.com").GetContentLength(maxRetries: 2);
         }
     }
 }

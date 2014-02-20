@@ -81,11 +81,17 @@ namespace Illumina.TerminalVelocity.Host
 
         private static void ClearCurrentConsoleLine()
         {
-            int currentLineCursor = Console.CursorTop;
-            Console.SetCursorPosition(0, Console.CursorTop);
-            for (int i = 0; i < Console.WindowWidth; i++)
-                Console.Write(" ");
-            Console.SetCursorPosition(0, currentLineCursor);
+            try
+            {
+                int currentLineCursor = Console.CursorTop;
+                Console.SetCursorPosition(0, Console.CursorTop);
+                for (int i = 0; i < Console.WindowWidth; i++)
+                    Console.Write(" ");
+                Console.SetCursorPosition(0, currentLineCursor);
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private static OptionSet CreateOptions(DownloadOptions options)

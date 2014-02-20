@@ -13,39 +13,57 @@ namespace Illumina.TerminalVelocity
         /// Returns the length of the resource by doing a quick get request
         /// </summary>
         /// <param name="uri"></param>
+        /// <param name="maxRetries"></param>
         /// <returns></returns>
-        public static long GetContentLength(this Uri uri)
+        public static long GetContentLength(this Uri uri, int maxRetries = 5)
         {
-            var client = new SimpleHttpGetByRangeClient(uri);
-            var response = client.Get(uri, 0, 1);
+            var retry = 0;
+            var maxTimeOut = 600;
 
-            if (response != null)
+            while (retry++ <= maxRetries)
             {
-                if (response.IsStatusCodeRedirect && !String.IsNullOrWhiteSpace(response.Location))
+                try
                 {
-                    if (response.Location != uri.AbsoluteUri)
-                    {
-                        uri = new Uri(response.Location);
-                        return GetContentLength(uri);
-                    }
-                    else
-                    {
-                        throw new ArgumentException("Supplied Url has no source");
-                    }
-                }
-                else if (response.WasSuccessful && response.ContentRangeLength >= 0)
-                {
-                    return response.ContentRangeLength.Value;
-                }
-                else if (response.StatusCode == 416)  //usually means zero byte file
-                {
-                    return response.ContentLength;
-                }
-                else
-                {
-                    throw new Exception("Response was not successful, status code: " + response.StatusCode);
-                }
+                    var client = new SimpleHttpGetByRangeClient(uri);
+                    var response = client.Get(uri, 0, 1);
 
+                    if (response != null)
+                    {
+                        if (response.IsStatusCodeRedirect && !String.IsNullOrWhiteSpace(response.Location))
+                        {
+                            if (response.Location != uri.AbsoluteUri)
+                            {
+                                uri = new Uri(response.Location);
+                                return GetContentLength(uri);
+                            }
+                            else
+                            {
+                                throw new ArgumentException("Supplied Url has no source");
+                            }
+                        }
+                        else if (response.WasSuccessful && response.ContentRangeLength >= 0)
+                        {
+                            return response.ContentRangeLength.Value;
+                        }
+                        else if (response.StatusCode == 416)  //usually means zero byte file
+                        {
+                            return response.ContentLength;
+                        }
+                        else
+                        {
+                            throw new Exception("Response was not successful, status code: " + response.StatusCode);
+                        }
+
+                    }
+                }
+                catch
+                {
+                    if (retry > maxRetries)
+                        throw;
+
+                    var delay = (int) Math.Min(maxTimeOut, Math.Pow(retry, 5));
+                    System.Threading.Thread.Sleep(1000 * delay);
+                }
             }
             throw new Exception("Response was not successful");
         }

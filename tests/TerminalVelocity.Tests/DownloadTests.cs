@@ -44,6 +44,12 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.True(response.ContentLength == response.Content.Length);
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            File.Delete(SafePath("sites_vcf.gz"));
+        }
+		
         [Test]
         public void ReadStackReturnsSequentially()
         {
@@ -78,30 +84,39 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.AreEqual( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
         }
 
-        [Test]
-        public void TestProgressBarComputation()
-        {
-            int chunkCount = 10000;
-            for (int zeroBasedChunkNumber = 0; zeroBasedChunkNumber <= chunkCount-1; zeroBasedChunkNumber++)
-            {
-                var progressIndicatorValue = Downloader.ComputeProgressIndicator(zeroBasedChunkNumber, chunkCount);
-                Console.WriteLine("{0}:{1}", zeroBasedChunkNumber, progressIndicatorValue);
+        //Sujit: no longer valid because now the progress is calculated using bytes written and filesize
+        //[Test]
+        //public void TestProgressBarComputation()
+        //{
+        //    int chunkCount = 10000;
+        //    for (int zeroBasedChunkNumber = 0; zeroBasedChunkNumber <= chunkCount-1; zeroBasedChunkNumber++)
+        //    {
+        //        var progressIndicatorValue = Downloader.ComputeProgressIndicator(zeroBasedChunkNumber, chunkCount);
+        //        Console.WriteLine("{0}:{1}", zeroBasedChunkNumber, progressIndicatorValue);
 
-                Assert.IsTrue(
-                    (zeroBasedChunkNumber == 0 && progressIndicatorValue == 1)
-                    || ((zeroBasedChunkNumber + 1) != chunkCount && progressIndicatorValue != 100) 
-                    || ((zeroBasedChunkNumber + 1) == chunkCount && progressIndicatorValue == 100)
-                    );
-            }
+        //        Assert.IsTrue(
+        //            (zeroBasedChunkNumber == 0 && progressIndicatorValue == 1)
+        //            || ((zeroBasedChunkNumber + 1) != chunkCount && progressIndicatorValue != 100) 
+        //            || ((zeroBasedChunkNumber + 1) == chunkCount && progressIndicatorValue == 100)
+        //            );
+        //    }
+        //}
+
+        [Test]
+        public void IfFileSizeIsZeroReturn100PercentProgress()
+        {            
+            int actual = Downloader.ComputeProgressIndicator(0, 0);
+            Assert.AreEqual(100, actual);
         }
 
-        [Test]
-        public void ProgressBarShowsCorrectWhenChunkCountIsOne()
-        {
-            int chunkCount = 1;
-            int actual = Downloader.ComputeProgressIndicator(0, 1);
-          Assert.AreEqual(100, actual);
-        }
+        //Sujit: no longer valid because now the progress is calculated using bytes written and filesize
+        //[Test]
+        //public void ProgressBarShowsCorrectWhenChunkCountIsOne()
+        //{
+        //    int chunkCount = 1;
+        //    int actual = Downloader.ComputeProgressIndicator(0, 1);
+        //  Assert.AreEqual(100, actual);
+        //}
 
         //[Test]
         //public void ThrottleDownloadWhenQueueIsFull()
@@ -192,7 +207,6 @@ namespace Illumina.TerminalVelocity.Tests
         {
             var parameters = new LargeFileDownloadParameters(new Uri(Constants.ONE_GIG_FILE_S_SL), "blah", 1000, verifyLength: false);
             var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
-            var e = new AutoResetEvent(false);
 
             byte[] sampleResponse = Encoding.UTF8.GetBytes("hello world");
             var mockClient = new Mock<ISimpleHttpGetByRangeClient>();
@@ -215,7 +229,7 @@ namespace Illumina.TerminalVelocity.Tests
             };
             var tokenSource = new CancellationTokenSource();
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = new Downloader(bufferManager, parameters, writeQueue, e, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = new Downloader(bufferManager, parameters, writeQueue, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
@@ -378,6 +392,7 @@ namespace Illumina.TerminalVelocity.Tests
                   path = SafePath("sites_vcf.gz");
                   Action<string> logger = (message) => { };
                   var timer = new Stopwatch();
+                  //a list to hold measured transfer rates
                   var transferRateList = new List<double>();
                   var asyncProgress = new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>(
                       obj =>
@@ -565,7 +580,6 @@ namespace Illumina.TerminalVelocity.Tests
             var path = SafePath("sites_vcf.gz");
             Action<string> logger = (message) => { };
 
-            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, null, maxThreads: 8);
             var transferRateList = new List<double>();
             var asyncProgress = new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>(
                 obj =>
@@ -576,7 +590,8 @@ namespace Illumina.TerminalVelocity.Tests
 
             var timer = new Stopwatch();
             timer.Start();
-            Task task = parameters.DownloadAsync(logger: logger, progress: asyncProgress);
+            ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, null, maxThreads: 8);
+            Task task = parameters.DownloadAsync(logger: logger, progress:asyncProgress);
             task.Wait(TimeSpan.FromMinutes(1));
             timer.Stop();
             var averageTransferRate = transferRateList.Average();
