@@ -66,7 +66,7 @@ namespace Illumina.TerminalVelocity
 
             bool isFailed = false;
             long totalBytesWritten = 0;
-            bool didAtleastOneProgressChangeEventFire = false;
+            double byteWriteRate = 0.0;
             try
             {
 
@@ -127,13 +127,12 @@ namespace Illumina.TerminalVelocity
                             {
                                 long bytesDownloaded = (long) writtenChunkZeroBased * parameters.MaxChunkSize;
                                 long interimReads = bytesDownloaded + part.Length - lastPointInFile;
-                                double byteWriteRate = (interimReads / (diff / (double)1000));                                
+                                byteWriteRate = (interimReads / (diff / (double)1000));                                
 
                                 lastPointInFile += interimReads;                                
                                 oldElapsedMilliSeconds = elapsed;
                                 progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize),
                                                                                               byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null));
-                                didAtleastOneProgressChangeEventFire = true;
                             }
                         }
                         writtenChunkZeroBased++;
@@ -225,13 +224,12 @@ namespace Illumina.TerminalVelocity
                     });
                 }
                 if (parameters.AutoCloseStream)
-                {
-                    //Sujit: for small files none of the above progress change event fires, so forcing it to fire at time of closing the file
-                    if (progress != null && !didAtleastOneProgressChangeEventFire)
+                {                    
+                    if (progress != null)
                     {
-                        progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed));
+                        progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null, isFailed));
                     }
-                    logger("AutoClosing stream");
+                    logger("[fildID:" + parameters.Id + "]"+"AutoClosing stream");
                     stream.Close();
                 }
             }
