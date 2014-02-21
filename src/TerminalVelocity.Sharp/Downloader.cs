@@ -64,6 +64,9 @@ namespace Illumina.TerminalVelocity
 
             var downloadWorkers = new List<Downloader>(numberOfThreads);
 
+            bool isFailed = false;
+            long totalBytesWritten = 0;
+            double byteWriteRate = 0.0;
             try
             {
 
@@ -99,6 +102,10 @@ namespace Illumina.TerminalVelocity
                 //start all the download threads
                 downloadWorkers.ForEach(x => x.Start());
 
+                var watch = new System.Diagnostics.Stopwatch();
+                watch.Start();
+                long oldElapsedMilliSeconds = watch.ElapsedMilliseconds;
+                long lastPointInFile = 0;                
                 int kc = 0;
                 //start the write loop
                 while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
@@ -110,10 +117,23 @@ namespace Illumina.TerminalVelocity
                         logger(string.Format("writing: {0}", writtenChunkZeroBased));
                         stream.Position = part.FileOffset;
                         stream.Write(part.Content, 0, part.Length);
+                        totalBytesWritten += part.Length;
                         bufferManager.FreeBuffer(part.Content);
                         if (progress != null)
                         {
-                            progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount), null));
+                            var elapsed = watch.ElapsedMilliseconds;
+                            var diff = elapsed - oldElapsedMilliSeconds;
+                            if (diff > 2000)
+                            {
+                                long bytesDownloaded = (long) writtenChunkZeroBased * parameters.MaxChunkSize;
+                                long interimReads = bytesDownloaded + part.Length - lastPointInFile;
+                                byteWriteRate = (interimReads / (diff / (double)1000));                                
+
+                                lastPointInFile += interimReads;                                
+                                oldElapsedMilliSeconds = elapsed;
+                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize),
+                                                                                              byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null));
+                            }
                         }
                         writtenChunkZeroBased++;
                     }
@@ -182,7 +202,14 @@ namespace Illumina.TerminalVelocity
             catch (Exception e)
             {
                 // Report Failure
-                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, true, e.Message));
+                isFailed = true;
+                logger("Exception: TerminalVelocity Downloading failed " + "[fildID:" + parameters.Id + "]");
+                logger("Exception: [fildID:" + parameters.Id + "]" + e.Message);
+                logger("Exception: [fildID:" + parameters.Id + "]" + e.StackTrace);
+                if (progress != null)
+                {
+                    progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed, e.Message));
+                }
             }
             finally
             {
@@ -197,7 +224,12 @@ namespace Illumina.TerminalVelocity
                     });
                 }
                 if (parameters.AutoCloseStream)
-                {
+                {                    
+                    if (progress != null)
+                    {
+                        progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null, isFailed));
+                    }
+                    logger("[fildID:" + parameters.Id + "]"+"AutoClosing stream");
                     stream.Close();
                 }
             }
@@ -229,13 +261,15 @@ namespace Illumina.TerminalVelocity
         }
 
 
-        public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
+        public static int ComputeProgressIndicator(long bytesWritten, long fileSize)
         {
-            if (chunkCount == 1)
-            {
-                return 100;
-            }
-            return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
+            return (int)((fileSize!=0)?((bytesWritten / (double)fileSize) * 100.0):100);
+            //if (chunkCount == 1)
+            //{
+            //    return 100;
+            //}
+            //return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
+
         }
 
         internal Downloader(BufferManager bufferManager, 

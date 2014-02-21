@@ -44,6 +44,12 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.True(response.ContentLength == response.Content.Length);
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            File.Delete(SafePath("sites_vcf.gz"));
+        }
+		
         [Test]
         public void ReadStackReturnsSequentially()
         {
@@ -78,30 +84,39 @@ namespace Illumina.TerminalVelocity.Tests
             Assert.AreEqual( expected, Downloader.ExpectedDownloadTimeInSeconds(chunkSize));
         }
 
-        [Test]
-        public void TestProgressBarComputation()
-        {
-            int chunkCount = 10000;
-            for (int zeroBasedChunkNumber = 0; zeroBasedChunkNumber <= chunkCount-1; zeroBasedChunkNumber++)
-            {
-                var progressIndicatorValue = Downloader.ComputeProgressIndicator(zeroBasedChunkNumber, chunkCount);
-                Console.WriteLine("{0}:{1}", zeroBasedChunkNumber, progressIndicatorValue);
+        //Sujit: no longer valid because now the progress is calculated using bytes written and filesize
+        //[Test]
+        //public void TestProgressBarComputation()
+        //{
+        //    int chunkCount = 10000;
+        //    for (int zeroBasedChunkNumber = 0; zeroBasedChunkNumber <= chunkCount-1; zeroBasedChunkNumber++)
+        //    {
+        //        var progressIndicatorValue = Downloader.ComputeProgressIndicator(zeroBasedChunkNumber, chunkCount);
+        //        Console.WriteLine("{0}:{1}", zeroBasedChunkNumber, progressIndicatorValue);
 
-                Assert.IsTrue(
-                    (zeroBasedChunkNumber == 0 && progressIndicatorValue == 1)
-                    || ((zeroBasedChunkNumber + 1) != chunkCount && progressIndicatorValue != 100) 
-                    || ((zeroBasedChunkNumber + 1) == chunkCount && progressIndicatorValue == 100)
-                    );
-            }
+        //        Assert.IsTrue(
+        //            (zeroBasedChunkNumber == 0 && progressIndicatorValue == 1)
+        //            || ((zeroBasedChunkNumber + 1) != chunkCount && progressIndicatorValue != 100) 
+        //            || ((zeroBasedChunkNumber + 1) == chunkCount && progressIndicatorValue == 100)
+        //            );
+        //    }
+        //}
+
+        [Test]
+        public void IfFileSizeIsZeroReturn100PercentProgress()
+        {            
+            int actual = Downloader.ComputeProgressIndicator(0, 0);
+            Assert.AreEqual(100, actual);
         }
 
-        [Test]
-        public void ProgressBarShowsCorrectWhenChunkCountIsOne()
-        {
-            int chunkCount = 1;
-            int actual = Downloader.ComputeProgressIndicator(0, 1);
-          Assert.AreEqual(100, actual);
-        }
+        //Sujit: no longer valid because now the progress is calculated using bytes written and filesize
+        //[Test]
+        //public void ProgressBarShowsCorrectWhenChunkCountIsOne()
+        //{
+        //    int chunkCount = 1;
+        //    int actual = Downloader.ComputeProgressIndicator(0, 1);
+        //  Assert.AreEqual(100, actual);
+        //}
 
         //[Test]
         //public void ThrottleDownloadWhenQueueIsFull()
@@ -377,15 +392,32 @@ namespace Illumina.TerminalVelocity.Tests
                   path = SafePath("sites_vcf.gz");
                   Action<string> logger = (message) => { };
                   var timer = new Stopwatch();
-                  timer.Start();
+                  //a list to hold measured transfer rates
+                  var transferRateList = new List<double>();
+                  var asyncProgress = new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>(
+                      obj =>
+                      {
+                          transferRateList.Add(obj.DownloadBitRate);
+                          logger("progress");
+                      });
+
                   var manager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, (uint)threadCount), new BufferQueueSetting(LargeFileDownloadParameters.DEFAULT_MAX_CHUNK_SIZE) });
                   ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1297662912, null, maxThreads: threadCount);
-                  Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager);
+                  
+                  timer.Start();
+                  
+                  Task task = parameters.DownloadAsync(logger: logger, bufferManager: manager, progress: asyncProgress);
+                  
                   task.Wait(TimeSpan.FromMinutes(25));
                   timer.Stop();
-                  Debug.WriteLine("Took {0} threads {1} ms", threadCount, timer.ElapsedMilliseconds);
+
+                  var averageTransferRate = transferRateList.Average();
+                  Debug.WriteLine("Took {0} threads {1} ms with average transfer rate of {2}", threadCount, timer.ElapsedMilliseconds, averageTransferRate);
                   //try to open the file
                   ValidateGZip(path, parameters.FileSize, Constants.ONE_GIG_CHECKSUM);
+
+                  //We expect that the approximate bytes transferred (calculated using average transfer rate) is with maximim error of 30% (accuracy of atleast 70%)
+                  Assert.AreEqual(parameters.FileSize, averageTransferRate * timer.Elapsed.TotalSeconds, 0.30 * parameters.FileSize);
               }
               finally
               {
@@ -547,15 +579,28 @@ namespace Illumina.TerminalVelocity.Tests
             var uri = new Uri(Constants.FIVE_MEG_FILE);
             var path = SafePath("sites_vcf.gz");
             Action<string> logger = (message) => { };
+
+            var transferRateList = new List<double>();
+            var asyncProgress = new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>(
+                obj =>
+                {
+                    transferRateList.Add(obj.DownloadBitRate);
+                    logger("progress");
+                });
+
             var timer = new Stopwatch();
             timer.Start();
             ILargeFileDownloadParameters parameters = new LargeFileDownloadParameters(uri, path, 1048576, null, maxThreads: 8);
-            Task task = parameters.DownloadAsync(logger: logger, progress: new AsyncProgress<LargeFileDownloadProgressChangedEventArgs>( s=> logger("progress")));
+            Task task = parameters.DownloadAsync(logger: logger, progress:asyncProgress);
             task.Wait(TimeSpan.FromMinutes(1));
             timer.Stop();
-            Debug.WriteLine("Took {0} threads {1} ms", 8, timer.ElapsedMilliseconds);
+            var averageTransferRate = transferRateList.Average();
+            Debug.WriteLine("Took {0} threads {1} ms with average transfer rate of {2}", 8, timer.ElapsedMilliseconds, averageTransferRate);
             //try to open the file
             ValidateGZip(path, parameters.FileSize, Constants.FIVE_MEG_CHECKSUM);
+
+            //We expect that the approximate bytes transferred (calculated using average transfer rate) is with maximim error of 30% (accuracy of atleast 70%)
+            Assert.AreEqual(parameters.FileSize, averageTransferRate * timer.Elapsed.TotalSeconds, 0.30 * parameters.FileSize);
         }
 
         [Test]

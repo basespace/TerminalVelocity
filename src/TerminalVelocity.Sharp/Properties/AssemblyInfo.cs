@@ -34,4 +34,4 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
-[assembly: InternalsVisibleTo("Illumina.TerminalVelocity.Tests")]
+//[assembly: InternalsVisibleTo("Illumina.TerminalVelocity.Tests")] //Sujit: had to comment this out to allow strong sigining TV for BaseSpaceDownloader
