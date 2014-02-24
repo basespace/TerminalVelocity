@@ -145,7 +145,7 @@ Range: bytes={2}-{3}
 #if XAMARIN       // THIS IS AN UGLY HACK TO MAKE IT WORK FOR SPACE ELEVATOR.            
                     sslStream = Helpers.IsRunningOnMono() ? new SslStream(clientStream, false, delegate { return true; }, null) : new SslStream(clientStream); 
 #else                    
-                    //sslStream = new SslStream(clientStream);
+                    sslStream = new SslStream(clientStream);
 #endif
                     sslStream.AuthenticateAsClient(baseUri.Host);
                     stream = sslStream;
