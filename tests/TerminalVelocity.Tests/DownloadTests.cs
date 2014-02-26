@@ -228,8 +228,9 @@ namespace Illumina.TerminalVelocity.Tests
                 return false;
             };
             var tokenSource = new CancellationTokenSource();
+            var failureToken = new FailureToken();
             var bufferManager = new BufferManager(new[] { new BufferQueueSetting(SimpleHttpGetByRangeClient.BUFFER_SIZE, 1), new BufferQueueSetting((uint)parameters.MaxChunkSize) });
-            var task = new Downloader(bufferManager, parameters, writeQueue, readStack, shouldSlw,Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, cancellation: tokenSource.Token);
+            var task = new Downloader(bufferManager, parameters, writeQueue, readStack, shouldSlw, Downloader.ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize), clientFactory: (x) => mockClient.Object, failureToken: failureToken, cancellation: tokenSource.Token);
             task.Start();
             Thread.Sleep(500);
             tokenSource.Cancel();
@@ -585,6 +586,7 @@ namespace Illumina.TerminalVelocity.Tests
                 obj =>
                 {
                     transferRateList.Add(obj.DownloadBitRate);
+                    Debug.WriteLine(obj.DownloadBitRate);
                     logger("progress");
                 });
 
@@ -599,8 +601,8 @@ namespace Illumina.TerminalVelocity.Tests
             //try to open the file
             ValidateGZip(path, parameters.FileSize, Constants.FIVE_MEG_CHECKSUM);
 
-            //We expect that the approximate bytes transferred (calculated using average transfer rate) is with maximim error of 30% (accuracy of atleast 70%)
-            Assert.AreEqual(parameters.FileSize, averageTransferRate * timer.Elapsed.TotalSeconds, 0.30 * parameters.FileSize);
+            //We expect that the approximate bytes transferred (calculated using average transfer rate) is with maximim error of 40% (accuracy of atleast 60%) because it is a small file and txrate is calculated once every two seconds.
+            Assert.AreEqual(parameters.FileSize, averageTransferRate * timer.Elapsed.TotalSeconds, 0.40 * parameters.FileSize);
         }
 
         [Test]
