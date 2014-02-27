@@ -55,6 +55,7 @@
     <Compile Include="ChunkedFilePart.cs" />
     <Compile Include="Downloader.cs" />
     <Compile Include="DownloadJobInfo.cs" />
+    <Compile Include="FailureToken.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="IFileWriter.cs" />
     <Compile Include="LargeFileDownloadWithStreamParameters.cs" />
