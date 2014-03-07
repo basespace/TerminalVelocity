@@ -43,7 +43,7 @@ namespace Illumina.TerminalVelocity
         {
             //create the file
             Stream stream = parameters.GetOutputStream();
-            if (parameters.FileSize == 0) // Teminate Zero size files
+            if (parameters.FileSize == 0) // Terminate Zero size files
             {
                 if (progress != null)
                 {
@@ -131,7 +131,7 @@ namespace Illumina.TerminalVelocity
                             var diff = elapsed - oldElapsedMilliSeconds;
                             if (diff > 2000)
                             {
-                                long bytesDownloaded = (long)chunksWritten.Where(kvp => kvp.Value).Count() * parameters.MaxChunkSize;
+                                long bytesDownloaded = (long)chunksWritten.Count(kvp => kvp.Value) * parameters.MaxChunkSize;
                                 long interimReads = bytesDownloaded + part.Length - lastPointInFile;
                                 byteWriteRate = (interimReads / (diff / (double)1000));                                
 
@@ -173,7 +173,7 @@ namespace Illumina.TerminalVelocity
                     var activeWorkers = downloadWorkers.Where(x => x != null &&
                         (x.Status == ThreadState.Running
                         || x.Status == ThreadState.WaitSleepJoin)).ToList();
-                    // respawn the missing workers if some had too many retries or were killed
+                    // re-spawn the missing workers if some had too many retries or were killed
 
                     if (NeedToCheckForUnwrittenChunks(readStack, lastWriteTime, STALE_WRITE_CHECK_MINUTES))
                     {
@@ -196,7 +196,7 @@ namespace Illumina.TerminalVelocity
                         {
                             if (downloadWorkers[i] == null)
                             {
-                                logger(string.Format("[{0}]" + " reviving killed thread", parameters.Id));
+                                logger(string.Format("[{0}] reviving killed thread", parameters.Id));
                                 downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
                                 downloadThrottle, expectedChunkDownloadTime, ft, logger, ct);
                                 downloadWorkers[i].Start();
@@ -219,14 +219,14 @@ namespace Illumina.TerminalVelocity
 
                 if (ft.FailureDetected)
                 {
-                    throw new Exception(String.Format("[{0}]A Non Retryable Failure was reported by one or more of the downloadworkers", parameters.Id));
+                    throw new Exception(String.Format("[{0}]A Non Retry-able Failure was reported by one or more of the download workers.", parameters.Id));
                 }
             }
             catch (Exception e)
             {
                 // Report Failure
                 isFailed = true;
-                logger(string.Format("[{0}] Exception: TerminalVelocity Downloading failed", parameters.Id));
+                logger(string.Format("[{0}] Exception: TerminalVelocity Downloading failed.", parameters.Id));
                 logger(string.Format("[{0}] Message: {1} ", parameters.Id, e.Message));
                 logger(string.Format("[{0}] StackTrace: {1}", parameters.Id, e.StackTrace));
                 if (progress != null)
@@ -329,7 +329,7 @@ namespace Illumina.TerminalVelocity
 
                                              while (currentChunk >= 0 && !cancellation.Value.IsCancellationRequested && !failureToken.FailureDetected) //-1 when we are done
                                              {
-                                                 logger(string.Format("[{1}]downloading: {0}", currentChunk,parameters.Id));
+                                                 logger(string.Format("[{1}] downloading: {0}", currentChunk,parameters.Id));
                                                  SimpleHttpResponse response = null;
                                                   var part = new ChunkedFilePart();
                                                  part.FileOffset =  GetChunkStart(currentChunk, parameters.MaxChunkSize);
