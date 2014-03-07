@@ -64,7 +64,7 @@ namespace Illumina.TerminalVelocity
 
 
             var downloadWorkers = new List<Downloader>(numberOfThreads);
-
+            var chunksWritten = new Dictionary<int, bool>();
             bool isFailed = false;
             long totalBytesWritten = 0;
             double byteWriteRate = 0.0;
@@ -75,7 +75,9 @@ namespace Illumina.TerminalVelocity
                 var readStack = new ConcurrentStack<int>();
 
                 //add all of the chunks to the stack
-                readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
+                var rangeArray = Enumerable.Range(0, chunkCount).Reverse().ToArray();
+                readStack.PushRange(rangeArray);
+                chunksWritten = readStack.ToDictionary(k => k, v => false);
 
                 var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
 
@@ -114,11 +116,12 @@ namespace Illumina.TerminalVelocity
                     while (writeQueue.TryDequeue(out part) && !ft.FailureDetected)
                     {
                         //retry?
-                        logger(string.Format("[{1}] writing: {0}", writtenChunkZeroBased, parameters.Id));
+                        logger(string.Format("[{1}] writing chunk: {0}", part.Chunk, parameters.Id));
                         stream.Position = part.FileOffset;
                         stream.Write(part.Content, 0, part.Length);
                         totalBytesWritten += part.Length;
                         bufferManager.FreeBuffer(part.Content);
+                        chunksWritten[part.Chunk] = true;
                         if (progress != null)
                         {
                             var elapsed = watch.ElapsedMilliseconds;
@@ -135,8 +138,10 @@ namespace Illumina.TerminalVelocity
                                                                                               byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null));
                             }
                         }
-                        writtenChunkZeroBased++;
                     }
+
+                    // have all the parts been written?
+                    writtenChunkZeroBased = chunksWritten.Count(kvp => kvp.Value);
 
                     // kill hanged workers
                     var timedOutWorkers = downloadWorkers
@@ -169,6 +174,14 @@ namespace Illumina.TerminalVelocity
                         (x.Status == ThreadState.Running
                         || x.Status == ThreadState.WaitSleepJoin)).ToList();
                     // respawn the missing workers if some had too many retries or were killed
+
+                    // if there are any parts remaining to be written, AND the read stack is empty
+                    var unwrittenParts = chunksWritten.Where(kvp => !kvp.Value);
+                    if (readStack.IsEmpty && unwrittenParts.Any() && !ft.FailureDetected)
+                    {
+                        logger(string.Format("read stack is empty, but there remains unwritten parts!  Adding {0} parts back to read stack.", unwrittenParts.Count()));
+                        readStack.PushRange(unwrittenParts.Select(kvp => kvp.Key).ToArray());
+                    }
 
                     //wait for something that was added
                     Thread.Sleep(100); 
@@ -334,10 +347,10 @@ namespace Illumina.TerminalVelocity
 
                                                  if (response != null && response.WasSuccessful)
                                                  {
-
+                                                     part.Chunk = currentChunk;
                                                      part.Content = response.Content;
                                                      writeQueue.Enqueue(part);
-
+                                                     
                                                      // reset the throttle when the part is finally successful
                                                      delayThrottle = 0;
                                                      logger(string.Format("[{1}] downloaded: {0}", currentChunk,parameters.Id));
