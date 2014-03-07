@@ -178,7 +178,7 @@ namespace Illumina.TerminalVelocity
                         {
                             if (downloadWorkers[i] == null)
                             {
-                                logger(string.Format("[{0}]" + "reviving killed thread", parameters.Id));
+                                logger(string.Format("[{0}]" + " reviving killed thread", parameters.Id));
                                 downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
                                 downloadThrottle, expectedChunkDownloadTime, ft, logger, ct);
                                 downloadWorkers[i].Start();
@@ -190,7 +190,7 @@ namespace Illumina.TerminalVelocity
                                 || downloadWorkers[i].Status == ThreadState.Background
                                 || downloadWorkers[i].Status == ThreadState.Stopped) continue;
 
-                            logger(string.Format("[{0}]" + "reviving killed thread", parameters.Id));
+                            logger(string.Format("[{0}] reviving killed thread", parameters.Id));
                             downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
                                                                 downloadThrottle, expectedChunkDownloadTime, ft, logger, ct);
                             downloadWorkers[i].Start();
@@ -201,16 +201,16 @@ namespace Illumina.TerminalVelocity
 
                 if (ft.FailureDetected)
                 {
-                    throw new Exception("A Non Retryable Failure was reported by one or more of the downloadworkers");
+                    throw new Exception(String.Format("[{0}]A Non Retryable Failure was reported by one or more of the downloadworkers", parameters.Id));
                 }
             }
             catch (Exception e)
             {
                 // Report Failure
                 isFailed = true;
-                logger(string.Format("Exception: TerminalVelocity Downloading failed " + "FileID:[{0}]", parameters.Id));
-                logger(string.Format("Exception: FileID:[{0}]{1}", parameters.Id, e.Message));
-                logger(string.Format("Exception: FileID:[{0}]{1}", parameters.Id, e.StackTrace));
+                logger(string.Format("[{0}] Exception: TerminalVelocity Downloading failed", parameters.Id));
+                logger(string.Format("[{0}] Message: {1} ", parameters.Id, e.Message));
+                logger(string.Format("[{0}] StackTrace: {1}", parameters.Id, e.StackTrace));
                 if (progress != null)
                 {
                     progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed, e.Message));
@@ -234,7 +234,7 @@ namespace Illumina.TerminalVelocity
                     {
                         progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null, isFailed));
                     }
-                    logger(string.Format("[{0}]" + "AutoClosing stream", parameters.Id));
+                    logger(string.Format("[{0}] AutoClosing stream", parameters.Id));
                     stream.Close();
                 }
             }
@@ -324,7 +324,7 @@ namespace Illumina.TerminalVelocity
                                                  }
                                                  catch (Exception e)
                                                  {
-                                                     logger(string.Format("[{0}]{1}", parameters.Id, (e.InnerException != null
+                                                     logger(string.Format("[{0}] {1}", parameters.Id, (e.InnerException != null
                                                              ? e.InnerException.Message
                                                              : e.Message)));
 
@@ -350,7 +350,7 @@ namespace Illumina.TerminalVelocity
                                                      }
                                                      while (downloadThrottle(currentChunk))
                                                      {
-                                                         logger(string.Format("[{1}]throttling for chunk: {0}", currentChunk,parameters.Id));
+                                                         logger(string.Format("[{1}] throttling for chunk: {0}", currentChunk,parameters.Id));
                                                          if (!cancellation.Value.IsCancellationRequested && !failureToken.FailureDetected)
                                                          {
                                                              Thread.Sleep(500);
@@ -360,7 +360,7 @@ namespace Illumina.TerminalVelocity
                                                  else if (response == null || response.IsStatusCodeRetryable)
                                                  {
                                                      int sleepSecs = Math.Min((int)Math.Pow(4.95, delayThrottle), 600);
-                                                     logger(string.Format("[{2}]sleeping: {0}, {1}s", currentChunk, sleepSecs, parameters.Id));
+                                                     logger(string.Format("[{2}] sleeping: {0}, {1}s", currentChunk, sleepSecs, parameters.Id));
                                                      if (!cancellation.Value.IsCancellationRequested && !failureToken.FailureDetected)
                                                      {
                                                          Thread.Sleep(sleepSecs * 1000); // 4s, 25s, 120s, 600s
@@ -369,8 +369,8 @@ namespace Illumina.TerminalVelocity
                                                  }
                                                  else
                                                  {
-                                                     logger(String.Format("[{3}]parameters.Uri:{0}  part.FileOffset:{1} part.Length:{2}", parameters.Uri, part.FileOffset, part.Length, parameters.Id));
-                                                     logger(string.Format("[{1}]ERROR!NonRetryableError! going to trigger download failure because got Response.StatusCode: {0}", response.StatusCode, parameters.Id));
+                                                     logger(String.Format("[{3}] parameters.Uri:{0}  part.FileOffset:{1} part.Length:{2}", parameters.Uri, part.FileOffset, part.Length, parameters.Id));
+                                                     logger(string.Format("[{1}] ERROR!NonRetryableError! going to trigger download failure because got Response.StatusCode: {0}", response.StatusCode, parameters.Id));
                                                      NonRetryableError = true;
                                                      failureToken.TriggerFailure();
                                                      break;
@@ -390,7 +390,7 @@ namespace Illumina.TerminalVelocity
                                                  ExecuteAndSquash(client.Dispose);
                                              }
                                          }
-                                     logger(String.Format("[{1}]Thread {0} done", Thread.CurrentThread.ManagedThreadId, parameters.Id));
+                                     logger(String.Format("[{1}] Thread {0} done", Thread.CurrentThread.ManagedThreadId, parameters.Id));
                                      }
                                      catch (ThreadAbortException exc)
                                      {
