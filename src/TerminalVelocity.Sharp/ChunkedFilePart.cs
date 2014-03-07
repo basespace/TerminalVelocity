@@ -12,5 +12,7 @@ namespace Illumina.TerminalVelocity
         public int Length { get; set; }
 
         public byte[] Content { get; set; }
+
+        public int Chunk { get; set; }
     }
 }

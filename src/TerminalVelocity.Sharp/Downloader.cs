@@ -25,6 +25,7 @@ namespace Illumina.TerminalVelocity
     
     public class Downloader
     {
+        public const int STALE_WRITE_CHECK_MINUTES = 5;
         public Thread DownloadWorkerThread { get; set; }
         public DateTime HeartBeat { get; set; }
 
@@ -64,7 +65,7 @@ namespace Illumina.TerminalVelocity
 
 
             var downloadWorkers = new List<Downloader>(numberOfThreads);
-
+            var chunksWritten = new Dictionary<int, bool>();
             bool isFailed = false;
             long totalBytesWritten = 0;
             double byteWriteRate = 0.0;
@@ -75,7 +76,9 @@ namespace Illumina.TerminalVelocity
                 var readStack = new ConcurrentStack<int>();
 
                 //add all of the chunks to the stack
-                readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
+                var rangeArray = Enumerable.Range(0, chunkCount).Reverse().ToArray();
+                readStack.PushRange(rangeArray);
+                chunksWritten = readStack.ToDictionary(k => k, v => false);
 
                 var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
 
@@ -105,27 +108,30 @@ namespace Illumina.TerminalVelocity
                 var watch = new System.Diagnostics.Stopwatch();
                 watch.Start();
                 long oldElapsedMilliSeconds = watch.ElapsedMilliseconds;
+                DateTime lastWriteTime = DateTime.MaxValue;
                 long lastPointInFile = 0;                
                 int kc = 0;
                 //start the write loop
-                while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested && !ft.FailureDetected)
+                while (chunksWritten.Any(kvp => !kvp.Value) && !ct.IsCancellationRequested && !ft.FailureDetected)
                 {
                     ChunkedFilePart part;
                     while (writeQueue.TryDequeue(out part) && !ft.FailureDetected)
                     {
                         //retry?
-                        logger(string.Format("[{1}] writing: {0}", writtenChunkZeroBased, parameters.Id));
+                        logger(string.Format("[{1}] writing chunk: {0}", part.Chunk, parameters.Id));
                         stream.Position = part.FileOffset;
                         stream.Write(part.Content, 0, part.Length);
                         totalBytesWritten += part.Length;
                         bufferManager.FreeBuffer(part.Content);
+                        chunksWritten[part.Chunk] = true;
+                        lastWriteTime = DateTime.Now;
                         if (progress != null)
                         {
                             var elapsed = watch.ElapsedMilliseconds;
                             var diff = elapsed - oldElapsedMilliSeconds;
                             if (diff > 2000)
                             {
-                                long bytesDownloaded = (long) writtenChunkZeroBased * parameters.MaxChunkSize;
+                                long bytesDownloaded = (long)chunksWritten.Where(kvp => kvp.Value).Count() * parameters.MaxChunkSize;
                                 long interimReads = bytesDownloaded + part.Length - lastPointInFile;
                                 byteWriteRate = (interimReads / (diff / (double)1000));                                
 
@@ -135,7 +141,6 @@ namespace Illumina.TerminalVelocity
                                                                                               byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null));
                             }
                         }
-                        writtenChunkZeroBased++;
                     }
 
                     // kill hanged workers
@@ -169,6 +174,19 @@ namespace Illumina.TerminalVelocity
                         (x.Status == ThreadState.Running
                         || x.Status == ThreadState.WaitSleepJoin)).ToList();
                     // respawn the missing workers if some had too many retries or were killed
+
+                    if (NeedToCheckForUnwrittenChunks(readStack, lastWriteTime, STALE_WRITE_CHECK_MINUTES))
+                    {
+                        // if there are any parts remaining to be written, AND the read stack is empty
+                        var unreadParts = chunksWritten.Where(kvp => !kvp.Value);
+                        if (readStack.IsEmpty && unreadParts.Any() && !ft.FailureDetected)
+                        {
+                            logger(string.Format("read stack is empty, but there remains unwritten parts!  Adding {0} parts back to read stack.", unreadParts.Count()));
+                            readStack.Push(unreadParts.Select(kvp => kvp.Key).First());
+                        }
+
+                        lastWriteTime = DateTime.Now; // don't check again for a while
+                    }
 
                     //wait for something that was added
                     Thread.Sleep(100); 
@@ -334,10 +352,10 @@ namespace Illumina.TerminalVelocity
 
                                                  if (response != null && response.WasSuccessful)
                                                  {
-
+                                                     part.Chunk = currentChunk;
                                                      part.Content = response.Content;
                                                      writeQueue.Enqueue(part);
-
+                                                     
                                                      // reset the throttle when the part is finally successful
                                                      delayThrottle = 0;
                                                      logger(string.Format("[{1}] downloaded: {0}", currentChunk,parameters.Id));
@@ -461,6 +479,19 @@ namespace Illumina.TerminalVelocity
 
             var remainder = (int) (fileSize%maxChunkSize);
             return remainder > 0 ? remainder : maxChunkSize;
+        }
+
+        public static bool NeedToCheckForUnwrittenChunks(ConcurrentStack<int> readStack, DateTime lastWriteTime, int minutesToWait)
+        {
+            if (readStack != null && readStack.IsEmpty)
+            {
+                if ((DateTime.Now - lastWriteTime).TotalMinutes > minutesToWait)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
