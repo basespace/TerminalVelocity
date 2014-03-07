@@ -25,6 +25,7 @@ namespace Illumina.TerminalVelocity
     
     public class Downloader
     {
+        public const int STALE_WRITE_CHECK_MINUTES = 5;
         public Thread DownloadWorkerThread { get; set; }
         public DateTime HeartBeat { get; set; }
 
@@ -107,10 +108,11 @@ namespace Illumina.TerminalVelocity
                 var watch = new System.Diagnostics.Stopwatch();
                 watch.Start();
                 long oldElapsedMilliSeconds = watch.ElapsedMilliseconds;
+                DateTime lastWriteTime = DateTime.MaxValue;
                 long lastPointInFile = 0;                
                 int kc = 0;
                 //start the write loop
-                while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested && !ft.FailureDetected)
+                while (chunksWritten.Any(kvp => !kvp.Value) && !ct.IsCancellationRequested && !ft.FailureDetected)
                 {
                     ChunkedFilePart part;
                     while (writeQueue.TryDequeue(out part) && !ft.FailureDetected)
@@ -122,13 +124,14 @@ namespace Illumina.TerminalVelocity
                         totalBytesWritten += part.Length;
                         bufferManager.FreeBuffer(part.Content);
                         chunksWritten[part.Chunk] = true;
+                        lastWriteTime = DateTime.Now;
                         if (progress != null)
                         {
                             var elapsed = watch.ElapsedMilliseconds;
                             var diff = elapsed - oldElapsedMilliSeconds;
                             if (diff > 2000)
                             {
-                                long bytesDownloaded = (long) writtenChunkZeroBased * parameters.MaxChunkSize;
+                                long bytesDownloaded = (long)chunksWritten.Where(kvp => kvp.Value).Count() * parameters.MaxChunkSize;
                                 long interimReads = bytesDownloaded + part.Length - lastPointInFile;
                                 byteWriteRate = (interimReads / (diff / (double)1000));                                
 
@@ -139,9 +142,6 @@ namespace Illumina.TerminalVelocity
                             }
                         }
                     }
-
-                    // have all the parts been written?
-                    writtenChunkZeroBased = chunksWritten.Count(kvp => kvp.Value);
 
                     // kill hanged workers
                     var timedOutWorkers = downloadWorkers
@@ -175,12 +175,17 @@ namespace Illumina.TerminalVelocity
                         || x.Status == ThreadState.WaitSleepJoin)).ToList();
                     // respawn the missing workers if some had too many retries or were killed
 
-                    // if there are any parts remaining to be written, AND the read stack is empty
-                    var unwrittenParts = chunksWritten.Where(kvp => !kvp.Value);
-                    if (readStack.IsEmpty && unwrittenParts.Any() && !ft.FailureDetected)
+                    if (NeedToCheckForUnwrittenChunks(readStack, lastWriteTime, STALE_WRITE_CHECK_MINUTES))
                     {
-                        logger(string.Format("read stack is empty, but there remains unwritten parts!  Adding {0} parts back to read stack.", unwrittenParts.Count()));
-                        readStack.PushRange(unwrittenParts.Select(kvp => kvp.Key).ToArray());
+                        // if there are any parts remaining to be written, AND the read stack is empty
+                        var unreadParts = chunksWritten.Where(kvp => !kvp.Value);
+                        if (readStack.IsEmpty && unreadParts.Any() && !ft.FailureDetected)
+                        {
+                            logger(string.Format("read stack is empty, but there remains unwritten parts!  Adding {0} parts back to read stack.", unreadParts.Count()));
+                            readStack.Push(unreadParts.Select(kvp => kvp.Key).First());
+                        }
+
+                        lastWriteTime = DateTime.Now; // don't check again for a while
                     }
 
                     //wait for something that was added
@@ -474,6 +479,19 @@ namespace Illumina.TerminalVelocity
 
             var remainder = (int) (fileSize%maxChunkSize);
             return remainder > 0 ? remainder : maxChunkSize;
+        }
+
+        public static bool NeedToCheckForUnwrittenChunks(ConcurrentStack<int> readStack, DateTime lastWriteTime, int minutesToWait)
+        {
+            if (readStack != null && readStack.IsEmpty)
+            {
+                if ((DateTime.Now - lastWriteTime).TotalMinutes > minutesToWait)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

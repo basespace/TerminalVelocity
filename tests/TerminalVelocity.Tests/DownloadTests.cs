@@ -650,7 +650,23 @@ namespace Illumina.TerminalVelocity.Tests
                  }
         }
 
-        
+        [Test]
+        public void TestStaleWriteEmptyStack()
+        {
+            var laterDate = DateTime.Now.AddMinutes(-10);
+            var concStack = new ConcurrentStack<int>();//empty stack
+            Assert.True(Downloader.NeedToCheckForUnwrittenChunks(concStack, laterDate, 5));
+        }
+
+        [Test]
+        public void TestStaleWriteNonEmptyStack()
+        {
+            var laterDate = DateTime.Now.AddMinutes(-10);
+            var concStack = new ConcurrentStack<int>();//empty stack
+            concStack.Push(10);
+            Assert.False(Downloader.NeedToCheckForUnwrittenChunks(concStack, laterDate, 5));
+        }
+
         public static string SafePath(string fileName)
         {
             string path = Path.Combine(Environment.CurrentDirectory,fileName);
