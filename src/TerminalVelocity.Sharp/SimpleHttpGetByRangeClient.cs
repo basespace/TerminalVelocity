@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Linq;
 
@@ -140,7 +141,12 @@ Range: bytes={2}-{3}
 
                 if (baseUri.Scheme.ToLower() == "https")
                 {
-                    var sslStream = new SslStream(clientStream);
+                    SslStream sslStream;
+#if XAMARIN       // THIS IS AN UGLY HACK TO MAKE IT WORK FOR SPACE ELEVATOR.            
+                    sslStream = Helpers.IsRunningOnMono() ? new SslStream(clientStream, false, delegate { return true; }, null) : new SslStream(clientStream); 
+#else                    
+                    sslStream = new SslStream(clientStream);
+#endif
                     sslStream.AuthenticateAsClient(baseUri.Host);
                     stream = sslStream;
                 }

@@ -16,32 +16,34 @@ namespace Illumina.TerminalVelocity
                                          Action<string> logger = null, BufferManager bufferManager = null)
         {
             CancellationToken ct = (cancellationToken != null) ? cancellationToken.Value : CancellationToken.None;
-
-            Task task = Task.Factory.StartNew(() => Downloader.StartDownloading(ct, parameters, progress, logger), ct);
+            FailureToken ft = new FailureToken();
+            Task task = Task.Factory.StartNew(() => Downloader.StartDownloading(ct, ft, parameters, progress, logger), ct);
 
             return task;
         }
     }
-
+    
     public class Downloader
     {
+        public const int STALE_WRITE_CHECK_MINUTES = 5;
         public Thread DownloadWorkerThread { get; set; }
         public DateTime HeartBeat { get; set; }
+
+        internal bool NonRetryableError { get; set; }
 
         // needed for Unit Testing
         internal bool SimulateTimedOut { get; set; }
         // needed for Unit Testing
 
-
-        internal static void StartDownloading(CancellationToken ct, 
+        internal static void StartDownloading(CancellationToken ct,  FailureToken ft,
             ILargeFileDownloadParameters parameters, 
             IAsyncProgress<LargeFileDownloadProgressChangedEventArgs> progress = null,
-            Action<string> logger = null, 
+            Action<string> logger = null,
             BufferManager bufferManager = null)
         {
             //create the file
             Stream stream = parameters.GetOutputStream();
-            if (parameters.FileSize == 0) // Teminate Zero size files
+            if (parameters.FileSize == 0) // Terminate Zero size files
             {
                 if (progress != null)
                 {
@@ -63,7 +65,10 @@ namespace Illumina.TerminalVelocity
 
 
             var downloadWorkers = new List<Downloader>(numberOfThreads);
-
+            var chunksWritten = new Dictionary<int, bool>();
+            bool isFailed = false;
+            long totalBytesWritten = 0;
+            double byteWriteRate = 0.0;
             try
             {
 
@@ -71,7 +76,9 @@ namespace Illumina.TerminalVelocity
                 var readStack = new ConcurrentStack<int>();
 
                 //add all of the chunks to the stack
-                readStack.PushRange(Enumerable.Range(0, chunkCount).Reverse().ToArray());
+                var rangeArray = Enumerable.Range(0, chunkCount).Reverse().ToArray();
+                readStack.PushRange(rangeArray);
+                chunksWritten = readStack.ToDictionary(k => k, v => false);
 
                 var writeQueue = new ConcurrentQueue<ChunkedFilePart>();
 
@@ -90,32 +97,50 @@ namespace Illumina.TerminalVelocity
                 
                 int expectedChunkDownloadTime = ExpectedDownloadTimeInSeconds(parameters.MaxChunkSize);
 
-
                 for (int i = 0; i < numberOfThreads; i++)
                 {
                     downloadWorkers.Add(new Downloader(bufferManager, parameters, writeQueue, readStack,
-                                        downloadThrottle, expectedChunkDownloadTime, logger, ct));
+                                        downloadThrottle, expectedChunkDownloadTime, ft, logger, ct));
                 }
                 //start all the download threads
                 downloadWorkers.ForEach(x => x.Start());
 
+                var watch = new System.Diagnostics.Stopwatch();
+                watch.Start();
+                long oldElapsedMilliSeconds = watch.ElapsedMilliseconds;
+                DateTime lastWriteTime = DateTime.MaxValue;
+                long lastPointInFile = 0;                
                 int kc = 0;
                 //start the write loop
-                while (writtenChunkZeroBased < chunkCount && !ct.IsCancellationRequested)
+                while (chunksWritten.Any(kvp => !kvp.Value) && !ct.IsCancellationRequested && !ft.FailureDetected)
                 {
                     ChunkedFilePart part;
-                    while (writeQueue.TryDequeue(out part))
+                    while (writeQueue.TryDequeue(out part) && !ft.FailureDetected)
                     {
                         //retry?
-                        logger(string.Format("writing: {0}", writtenChunkZeroBased));
+                        logger(string.Format("[{1}] writing chunk: {0}", part.Chunk, parameters.Id));
                         stream.Position = part.FileOffset;
                         stream.Write(part.Content, 0, part.Length);
+                        totalBytesWritten += part.Length;
                         bufferManager.FreeBuffer(part.Content);
+                        chunksWritten[part.Chunk] = true;
+                        lastWriteTime = DateTime.Now;
                         if (progress != null)
                         {
-                            progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(writtenChunkZeroBased, chunkCount), null));
+                            var elapsed = watch.ElapsedMilliseconds;
+                            var diff = elapsed - oldElapsedMilliSeconds;
+                            if (diff > 2000)
+                            {
+                                long bytesDownloaded = (long)chunksWritten.Count(kvp => kvp.Value) * parameters.MaxChunkSize;
+                                long interimReads = bytesDownloaded + part.Length - lastPointInFile;
+                                byteWriteRate = (interimReads / (diff / (double)1000));                                
+
+                                lastPointInFile += interimReads;                                
+                                oldElapsedMilliSeconds = elapsed;
+                                progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize),
+                                                                                              byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null));
+                            }
                         }
-                        writtenChunkZeroBased++;
                     }
 
                     // kill hanged workers
@@ -136,7 +161,7 @@ namespace Illumina.TerminalVelocity
                             try
                             {
                                 worker.DownloadWorkerThread.Abort(); // this has a minute chance of throwing
-                                logger(string.Format("killing thread as it timed out {0}", kc++));
+                                logger(string.Format("[{1}] killing thread as it timed out {0}", kc++, parameters.Id));
                                 if (worker.SimulateTimedOut)
                                     Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
                             }
@@ -148,7 +173,20 @@ namespace Illumina.TerminalVelocity
                     var activeWorkers = downloadWorkers.Where(x => x != null &&
                         (x.Status == ThreadState.Running
                         || x.Status == ThreadState.WaitSleepJoin)).ToList();
-                    // respawn the missing workers if some had too many retries or were killed
+                    // re-spawn the missing workers if some had too many retries or were killed
+
+                    if (NeedToCheckForUnwrittenChunks(readStack, lastWriteTime, STALE_WRITE_CHECK_MINUTES))
+                    {
+                        // if there are any parts remaining to be written, AND the read stack is empty
+                        var unreadParts = chunksWritten.Where(kvp => !kvp.Value);
+                        if (readStack.IsEmpty && unreadParts.Any() && !ft.FailureDetected)
+                        {
+                            logger(string.Format("read stack is empty, but there remains unwritten parts!  Adding {0} parts back to read stack.", unreadParts.Count()));
+                            readStack.Push(unreadParts.Select(kvp => kvp.Key).First());
+                        }
+
+                        lastWriteTime = DateTime.Now; // don't check again for a while
+                    }
 
                     //wait for something that was added
                     Thread.Sleep(100); 
@@ -158,9 +196,9 @@ namespace Illumina.TerminalVelocity
                         {
                             if (downloadWorkers[i] == null)
                             {
-                                logger("reviving killed thread");
+                                logger(string.Format("[{0}] reviving killed thread", parameters.Id));
                                 downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
-                                downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                                downloadThrottle, expectedChunkDownloadTime, ft, logger, ct);
                                 downloadWorkers[i].Start();
                                 continue;
                             }
@@ -170,19 +208,31 @@ namespace Illumina.TerminalVelocity
                                 || downloadWorkers[i].Status == ThreadState.Background
                                 || downloadWorkers[i].Status == ThreadState.Stopped) continue;
 
-                            logger("reviving killed thread");
+                            logger(string.Format("[{0}] reviving killed thread", parameters.Id));
                             downloadWorkers[i] = new Downloader(bufferManager, parameters, writeQueue, readStack,
-                                                                downloadThrottle, expectedChunkDownloadTime, logger, ct);
+                                                                downloadThrottle, expectedChunkDownloadTime, ft, logger, ct);
                             downloadWorkers[i].Start();
                         }
                     }
 
                 }
+
+                if (ft.FailureDetected)
+                {
+                    throw new Exception(String.Format("[{0}]A Non Retry-able Failure was reported by one or more of the download workers.", parameters.Id));
+                }
             }
             catch (Exception e)
             {
                 // Report Failure
-                progress.Report(new LargeFileDownloadProgressChangedEventArgs(100, 0, 0, parameters.FileSize, parameters.FileSize, "", "", null, true, e.Message));
+                isFailed = true;
+                logger(string.Format("[{0}] Exception: TerminalVelocity Downloading failed.", parameters.Id));
+                logger(string.Format("[{0}] Message: {1} ", parameters.Id, e.Message));
+                logger(string.Format("[{0}] StackTrace: {1}", parameters.Id, e.StackTrace));
+                if (progress != null)
+                {
+                    progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), 0, 0, totalBytesWritten, totalBytesWritten, "", "", null, isFailed, e.Message));
+                }
             }
             finally
             {
@@ -197,7 +247,12 @@ namespace Illumina.TerminalVelocity
                     });
                 }
                 if (parameters.AutoCloseStream)
-                {
+                {                    
+                    if (progress != null)
+                    {
+                        progress.Report(new LargeFileDownloadProgressChangedEventArgs(ComputeProgressIndicator(totalBytesWritten, parameters.FileSize), byteWriteRate, byteWriteRate, totalBytesWritten, totalBytesWritten, "", "", null, isFailed));
+                    }
+                    logger(string.Format("[{0}] AutoClosing stream", parameters.Id));
                     stream.Close();
                 }
             }
@@ -228,14 +283,15 @@ namespace Illumina.TerminalVelocity
             }
         }
 
-
-        public static int ComputeProgressIndicator(int zeroBasedChunkNumber, int chunkCount)
+        public static int ComputeProgressIndicator(long bytesWritten, long fileSize)
         {
-            if (chunkCount == 1)
-            {
-                return 100;
-            }
-            return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
+            return (int)((fileSize!=0)?((bytesWritten / (double)fileSize) * 100.0):100);
+            //if (chunkCount == 1)
+            //{
+            //    return 100;
+            //}
+            //return 1 + 99 * zeroBasedChunkNumber / (chunkCount - 1);
+
         }
 
         internal Downloader(BufferManager bufferManager, 
@@ -243,13 +299,15 @@ namespace Illumina.TerminalVelocity
                             ConcurrentQueue<ChunkedFilePart> writeQueue,
                             ConcurrentStack<int> readStack,
                             Func<int, bool> downloadThrottle, 
-                            int expectedChunkTimeInSeconds, 
+                            int expectedChunkTimeInSeconds,
+                            FailureToken failureToken,
                             Action<string> logger = null,
-                            CancellationToken? cancellation = null,
+                            CancellationToken? cancellation = null,                             
                             Func<ILargeFileDownloadParameters, 
                             ISimpleHttpGetByRangeClient> clientFactory = null)
         {
             SimulateTimedOut = false;
+            NonRetryableError = false;
             HeartBeat = DateTime.Now;
             cancellation = (cancellation != null) ? cancellation.Value : CancellationToken.None;
 
@@ -267,86 +325,90 @@ namespace Illumina.TerminalVelocity
                                      int delayThrottle = 0;
 
                                      try
-                                     {
-
-                                         while (currentChunk >= 0 && !cancellation.Value.IsCancellationRequested) //-1 when we are done
                                          {
-                                             logger(string.Format("downloading: {0}", currentChunk));
-                                             SimpleHttpResponse response = null;
-                                              var part = new ChunkedFilePart();
-                                             part.FileOffset =  GetChunkStart(currentChunk, parameters.MaxChunkSize);
-                                             part.Length = GetChunkSizeForCurrentChunk(parameters.FileSize,
-                                                                                       parameters.MaxChunkSize,
-                                                                                       currentChunk);
-                                             try
+
+                                             while (currentChunk >= 0 && !cancellation.Value.IsCancellationRequested && !failureToken.FailureDetected) //-1 when we are done
                                              {
-                                                 response = client.Get(parameters.Uri, part.FileOffset, part.Length);
-                                             }
-                                             catch (Exception e)
-                                             {
-                                                 if (e.InnerException != null)
-                                                     logger(e.InnerException.Message);
-                                                 else
-                                                     logger(e.Message);
-
-                                                 ExecuteAndSquash(client.Dispose);
-                                                 client = clientFactory(parameters);
-                                             }
-
-                                             if (response != null && response.WasSuccessful)
-                                             {
-
-                                                 part.Content = response.Content;
-                                                 writeQueue.Enqueue(part);
-
-                                                 // reset the throttle when the part is finally successful
-                                                 delayThrottle = 0;
-                                                 logger(string.Format("downloaded: {0}", currentChunk));
-
-                                                 HeartBeat = DateTime.Now;
-
-                                                 if (!readStack.TryPop(out currentChunk))
+                                                 logger(string.Format("[{1}] downloading: {0}", currentChunk,parameters.Id));
+                                                 SimpleHttpResponse response = null;
+                                                  var part = new ChunkedFilePart();
+                                                 part.FileOffset =  GetChunkStart(currentChunk, parameters.MaxChunkSize);
+                                                 part.Length = GetChunkSizeForCurrentChunk(parameters.FileSize,
+                                                                                           parameters.MaxChunkSize,
+                                                                                           currentChunk);
+                                                 try
                                                  {
-                                                     currentChunk = -1;
+                                                     response = client.Get(parameters.Uri, part.FileOffset, part.Length);
                                                  }
-                                                 while (downloadThrottle(currentChunk))
+                                                 catch (Exception e)
                                                  {
-                                                     logger(string.Format("throttling for chunk: {0}", currentChunk));
-                                                     if (!cancellation.Value.IsCancellationRequested)
+                                                     logger(string.Format("[{0}] {1}", parameters.Id, (e.InnerException != null
+                                                             ? e.InnerException.Message
+                                                             : e.Message)));
+
+                                                     ExecuteAndSquash(client.Dispose);
+                                                     client = clientFactory(parameters);
+                                                 }
+
+                                                 if (response != null && response.WasSuccessful)
+                                                 {
+                                                     part.Chunk = currentChunk;
+                                                     part.Content = response.Content;
+                                                     writeQueue.Enqueue(part);
+                                                     
+                                                     // reset the throttle when the part is finally successful
+                                                     delayThrottle = 0;
+                                                     logger(string.Format("[{1}] downloaded: {0}", currentChunk,parameters.Id));
+
+                                                     HeartBeat = DateTime.Now;
+
+                                                     if (!readStack.TryPop(out currentChunk))
                                                      {
-                                                         Thread.Sleep(500);
+                                                         currentChunk = -1;
+                                                     }
+                                                     while (downloadThrottle(currentChunk))
+                                                     {
+                                                         logger(string.Format("[{1}] throttling for chunk: {0}", currentChunk,parameters.Id));
+                                                         if (!cancellation.Value.IsCancellationRequested && !failureToken.FailureDetected)
+                                                         {
+                                                             Thread.Sleep(500);
+                                                         }
                                                      }
                                                  }
-                                             }
-                                             else if (response == null || response.IsStatusCodeRetryable)
-                                             {
-                                                 int sleepSecs = Math.Min((int)Math.Pow(4.95, delayThrottle), 600);
-                                                 logger(string.Format("sleeping: {0}, {1}s", currentChunk, sleepSecs));
-                                                 if (!cancellation.Value.IsCancellationRequested)
+                                                 else if (response == null || response.IsStatusCodeRetryable)
                                                  {
-                                                     Thread.Sleep(sleepSecs * 1000); // 4s, 25s, 120s, 600s
-                                                     delayThrottle++;
+                                                     int sleepSecs = Math.Min((int)Math.Pow(4.95, delayThrottle), 600);
+                                                     logger(string.Format("[{2}] sleeping: {0}, {1}s", currentChunk, sleepSecs, parameters.Id));
+                                                     if (!cancellation.Value.IsCancellationRequested && !failureToken.FailureDetected)
+                                                     {
+                                                         Thread.Sleep(sleepSecs * 1000); // 4s, 25s, 120s, 600s
+                                                         delayThrottle++;
+                                                     }
+                                                 }
+                                                 else
+                                                 {
+                                                     logger(String.Format("[{3}] parameters.Uri:{0}  part.FileOffset:{1} part.Length:{2}", parameters.Uri, part.FileOffset, part.Length, parameters.Id));
+                                                     logger(string.Format("[{1}] ERROR!NonRetryableError! going to trigger download failure because got Response.StatusCode: {0}", response.StatusCode, parameters.Id));
+                                                     NonRetryableError = true;
+                                                     failureToken.TriggerFailure();
+                                                     break;
+                                                     //throw new SimpleHttpClientException(response);
                                                  }
                                              }
-                                             else
+                                         }
+                                         finally
+                                         {
+                                             if (currentChunk >= 0  /*&& !NonRetryableError*/)
                                              {
-                                                 throw new SimpleHttpClientException(response);
+                                                 //put it back on the stack, if it's poison everyone else will die
+                                                 readStack.Push(currentChunk);
+                                             }
+                                             if (client != null)
+                                             {
+                                                 ExecuteAndSquash(client.Dispose);
                                              }
                                          }
-                                     }
-                                     finally
-                                     {
-                                         if (currentChunk >= 0)
-                                         {
-                                             //put it back on the stack, if it's poison everyone else will die
-                                             readStack.Push(currentChunk);
-                                         }
-                                         if (client != null)
-                                         {
-                                             ExecuteAndSquash(client.Dispose);
-                                         }
-                                     }
-                                     logger(String.Format("Thread {0} done" ,Thread.CurrentThread.ManagedThreadId));
+                                     logger(String.Format("[{1}] Thread {0} done", Thread.CurrentThread.ManagedThreadId, parameters.Id));
                                      }
                                      catch (ThreadAbortException exc)
                                      {
@@ -417,6 +479,19 @@ namespace Illumina.TerminalVelocity
 
             var remainder = (int) (fileSize%maxChunkSize);
             return remainder > 0 ? remainder : maxChunkSize;
+        }
+
+        public static bool NeedToCheckForUnwrittenChunks(ConcurrentStack<int> readStack, DateTime lastWriteTime, int minutesToWait)
+        {
+            if (readStack != null && readStack.IsEmpty)
+            {
+                if ((DateTime.Now - lastWriteTime).TotalMinutes > minutesToWait)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
