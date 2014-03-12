@@ -294,7 +294,7 @@ namespace Illumina.TerminalVelocity
 
         }
 
-        internal Downloader(BufferManager bufferManager, 
+        public Downloader(BufferManager bufferManager, 
                             ILargeFileDownloadParameters parameters,
                             ConcurrentQueue<ChunkedFilePart> writeQueue,
                             ConcurrentStack<int> readStack,
@@ -431,7 +431,7 @@ namespace Illumina.TerminalVelocity
             }
         }
         
-        internal static int ExpectedDownloadTimeInSeconds(int chunkSizeInBytes)
+        public static int ExpectedDownloadTimeInSeconds(int chunkSizeInBytes)
         {
             //so lets say 128Kbps per second with no overhead takes 62 seconds for 1MB 64kb = 16384bytes
             //20% latency
@@ -443,12 +443,12 @@ namespace Illumina.TerminalVelocity
         }
 
 
-        internal static long GetChunkStart(int currentChunk, int maxChunkSize)
+        public static long GetChunkStart(int currentChunk, int maxChunkSize)
         {
             return currentChunk*(long)maxChunkSize;
         }
 
-        internal static int GetChunkCount(long fileSize, long chunkSize)
+        public static int GetChunkCount(long fileSize, long chunkSize)
         {
             if (chunkSize == 0)
                 return 0;
@@ -463,7 +463,7 @@ namespace Illumina.TerminalVelocity
             return 1 + chunkCount;
         }
 
-        internal static int GetChunkSizeForCurrentChunk(long fileSize, int maxChunkSize, int zeroBasedChunkNumber)
+        public static int GetChunkSizeForCurrentChunk(long fileSize, int maxChunkSize, int zeroBasedChunkNumber)
         {
             int chunkCount = GetChunkCount(fileSize, maxChunkSize);
 

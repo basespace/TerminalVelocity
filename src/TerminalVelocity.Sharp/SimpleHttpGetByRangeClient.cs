@@ -160,7 +160,7 @@ Range: bytes={2}-{3}
         }
 
 
-        internal static string BuildHttpRequest(Uri uri, long start, long length)
+        public static string BuildHttpRequest(Uri uri, long start, long length)
         {
             string hostHeader;
             // see if they provided a port explicitly in the URI. If so, that must be set in the header

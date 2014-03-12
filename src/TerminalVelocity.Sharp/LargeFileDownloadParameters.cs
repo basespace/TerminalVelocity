@@ -79,7 +79,7 @@ namespace Illumina.TerminalVelocity
             return stream;
         }
 
-        internal static void EnsureCleanFile(string filePath, bool deleteIfExists)
+        public static void EnsureCleanFile(string filePath, bool deleteIfExists)
         {
             if ((File.Exists(filePath) && deleteIfExists) || !File.Exists(filePath))
             {
