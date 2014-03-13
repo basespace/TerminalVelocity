@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -21,7 +21,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;XAMARIN</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -29,16 +29,13 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;XAMARIN</DefineConstants>
+    <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>..\..\..\SpaceElevator\src\SpaceElevator.Client\IlluminaStrongNameKey.snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
+    <SignAssembly>false</SignAssembly>
+  </PropertyGroup> 
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -75,9 +72,6 @@
     <Compile Include="SocketErrorCodes.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\SpaceElevator\src\SpaceElevator.Client\IlluminaStrongNameKey.snk">
-      <Link>IlluminaStrongNameKey.snk</Link>
-    </None>
     <None Include="TerminalVelocity.Sharp.nuspec" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

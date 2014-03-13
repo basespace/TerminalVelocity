@@ -72,7 +72,6 @@ namespace Illumina.TerminalVelocity
             try
             {
 
-                int writtenChunkZeroBased = 0;
                 var readStack = new ConcurrentStack<int>();
 
                 //add all of the chunks to the stack
@@ -165,7 +164,7 @@ namespace Illumina.TerminalVelocity
                                 if (worker.SimulateTimedOut)
                                     Thread.Sleep(3000); // introduce delay for unit test to pick-up the condition
                             }
-                            catch (Exception ex)
+                            catch (Exception)
                             { }
                         }
                     }
