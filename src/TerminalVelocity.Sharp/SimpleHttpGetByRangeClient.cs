@@ -142,7 +142,7 @@ Range: bytes={2}-{3}
                 if (baseUri.Scheme.ToLower() == "https")
                 {
                     SslStream sslStream;
-#if XAMARIN       // THIS IS AN UGLY HACK TO MAKE IT WORK FOR SPACE ELEVATOR.            
+#if XAMARIN       // THIS IS AN UGLY HACK TO MAKE MONO TRUST EVERYTHING TO WORK FOR SPACE ELEVATOR (BaseSpace Downloader).            
                     sslStream = Helpers.IsRunningOnMono() ? new SslStream(clientStream, false, delegate { return true; }, null) : new SslStream(clientStream); 
 #else                    
                     sslStream = new SslStream(clientStream);
