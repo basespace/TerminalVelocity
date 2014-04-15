@@ -15,7 +15,7 @@ namespace Illumina.TerminalVelocity.Tests
         public void TimeoutQuitsAsExpected()
         {
             var client =  new SimpleHttpGetByRangeClient(new Uri(Constants.ONE_GIG_FILE_S_SL), timeout: 1);
-            var response = client.Get(0, 1024*10);//something large
+            var response = client.Get(0, 1024*1024*10);//something large
             Assert.Fail("Timeout didn't happen");
         }
 
