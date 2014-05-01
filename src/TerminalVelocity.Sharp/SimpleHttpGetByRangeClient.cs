@@ -11,12 +11,7 @@ namespace Illumina.TerminalVelocity
 {
     public class SimpleHttpGetByRangeClient : ISimpleHttpGetByRangeClient
     {
-        public const string REQUEST_TEMPLATE = @"GET {0} HTTP/1.1
-Host: {1}
-Connection: keep-alive
-Range: bytes={2}-{3}
-
-";
+        public const string REQUEST_TEMPLATE = "GET {0} HTTP/1.1\r\nHost: {1}\r\nConnection: keep-alive\r\nRange: bytes={2}-{3}\r\n\r\n";
         internal const string INVALID_HEADER_LENGTH = "Invalid Header length";
         internal const string STREAM_CLOSED_ERROR = "The stream is not returning any more data";
         public static readonly byte[] BODY_INDICATOR = new byte[] { 13, 10, 13, 10 };
