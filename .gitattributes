@@ -15,6 +15,8 @@
 *.jpg   binary
 *.png  binary
 *.gif  binary
+*.exe 	binary
+*.dll 	binary
 
 *.cs text=auto diff=csharp 
 *.vb text=auto
