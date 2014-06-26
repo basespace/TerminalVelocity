@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Illumina.TerminalVelocity
 {
-    internal class FailureToken 
+    public class FailureToken 
     {
         public bool FailureDetected { get; private set; }        
 
