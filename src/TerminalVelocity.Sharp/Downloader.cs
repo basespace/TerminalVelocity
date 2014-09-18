@@ -17,7 +17,14 @@ namespace Illumina.TerminalVelocity
         {
             CancellationToken ct = (cancellationToken != null) ? cancellationToken.Value : CancellationToken.None;
             FailureToken ft = new FailureToken();
-            Task task = Task.Factory.StartNew(() => Downloader.StartDownloading(ct, ft, parameters, progress, logger), ct);
+            Task task = Task.Factory.StartNew(() =>
+            {
+                // we put this logic on a new thread to avoid the risk of 
+                // running into thread starvation on the threadpool / deadlocks
+                var t = new Thread(() => Downloader.StartDownloading(ct, ft, parameters, progress, logger));
+                t.Start();
+                t.Join();
+            } , ct);
 
             return task;
         }
