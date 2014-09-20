@@ -52,6 +52,11 @@ namespace Illumina.TerminalVelocity
                         {
                             return response.ContentLength;
                         }
+                        else if (response.StatusCode == 404) 
+                        {
+                            // we don't retry 404
+                            return retry = maxRetries;
+                        }
                         else
                         {
                             throw new Exception("Response was not successful, status code: " + response.StatusCode);
