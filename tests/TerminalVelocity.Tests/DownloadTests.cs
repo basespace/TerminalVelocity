@@ -21,7 +21,7 @@ namespace Illumina.TerminalVelocity.Tests
     {
         public DownloadTests()
         {
-            Debug.Listeners.Add(new DefaultTraceListener());
+          //  Debug.Listeners.Add(new DefaultTraceListener());
         }
        
         [Test]

@@ -51,7 +51,7 @@ namespace Illumina.TerminalVelocity.Tests
 
         [Ignore("this test hangs the build - ignoring it.")]
         [Test]
-        [ExpectedException(typeof(SocketException))]
+      //  [ExpectedException(typeof(SocketException))]
         public void GetContentLengthThrowsOnInvalidUrl()
         {
             var fileSize = new Uri("http://blah.com").GetContentLength();

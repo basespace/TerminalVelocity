@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using NUnit.Framework;
 
 namespace Illumina.TerminalVelocity.Tests
@@ -12,7 +9,7 @@ namespace Illumina.TerminalVelocity.Tests
     {
         [Test]
         [Ignore("To temporarily fix build failure")]
-        [ExpectedException(typeof(IOException))]
+    //    [ExpectedException(typeof(IOException))]
         public void TimeoutQuitsAsExpected()
         {
             var client =  new SimpleHttpGetByRangeClient(new Uri(Constants.ONE_GIG_FILE_S_SL), timeout: 1);
