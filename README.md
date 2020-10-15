@@ -2,7 +2,7 @@ TerminalVelocity
 ================
 
 Purpose of this project is to download a large file in .net as fast as possible. Think of curl, but only for downloading large files multi-threaded and as fast as possible.
-
+That makes things real quick and easy.
  This specifically only works with file download over http/https with servers that [accept byte range requests](http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html). Specifically we only support the Range: bytes={start}-{end} header.  Even more specific, this has mainly been used and tested against Amazon S3's http endpoints.
 
 ![](http://www.marerico.com/moviepictures/Terminal_Velocity.jpg)
@@ -50,6 +50,8 @@ Purpose of this project is to download a large file in .net as fast as possible.
 ## Notes ##
 Mono has no SSL certs by default.  Easiest way to add support is to do this:
 sudo /usr/local/bin/mozroots --machine --import --sync
+
+yo yo .....
 
 
 
