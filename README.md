@@ -51,6 +51,8 @@ That makes things real quick and easy.
 Mono has no SSL certs by default.  Easiest way to add support is to do this:
 sudo /usr/local/bin/mozroots --machine --import --sync
 
+yo yo .....
+
 
 
 
